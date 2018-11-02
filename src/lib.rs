@@ -14,32 +14,38 @@ pub struct PublicKey(G1);
 pub struct Signature(G2);
 
 impl PrivateKey {
-    /// Generate a new public - private key pair.
+    /// Generate a new private key.
     pub fn generate<R: Rng>(rng: &mut R) -> Self {
+        // TODO: probably some better way to derive than just a random field element, but maybe
+        // this is enough?
         PrivateKey(rng.gen())
     }
 
     /// Sign the given message.
+    /// Calculated by `signature = hash_into_g2(message) * sk`
     pub fn sign(&self, message: &[u8]) -> Signature {
         // TODO: cache these
         // TODO: determine the right window size
         let g = G2::hash(message);
-        let s = self.0.into_repr();
+        let sk = self.0.into_repr();
 
-        // compute g * s
+        // compute g * sk
         let mut wnaf = Wnaf::new();
-        Signature(wnaf.scalar(s).base(g))
+        Signature(wnaf.scalar(sk).base(g))
     }
 
+    /// Get the public key for this private key.
+    /// Calculated by `pk = g1 * sk`.
     pub fn public_key(&self) -> PublicKey {
         // TODO: cache?
-        let s = self.0.into_repr();
+        let sk = self.0.into_repr();
         let mut wnaf = Wnaf::new();
-        PublicKey(wnaf.scalar(s).base(G1::one()))
+        PublicKey(wnaf.scalar(sk).base(G1::one()))
     }
 }
 
 /// Aggregate signatures by multiplying them together.
+/// Calculated by `signature = \sum_{i = 0}^n signature_i`.
 pub fn aggregate_signatures(signatures: &[Signature]) -> Signature {
     let mut res = G2::zero();
     for signature in signatures {
@@ -50,6 +56,7 @@ pub fn aggregate_signatures(signatures: &[Signature]) -> Signature {
 }
 
 /// Verifies that the signature is the actual aggregated signature of hashes - pubkeys.
+/// Calculated by `e(g1, signature) == \prod_{i = 0}^n e(pk_i, hash_i)`.
 pub fn verify(signature: &Signature, hashes: &[G2], public_keys: &[PublicKey]) -> bool {
     assert_eq!(hashes.len(), public_keys.len());
 
