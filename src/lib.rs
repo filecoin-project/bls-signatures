@@ -3,13 +3,17 @@
 extern crate ff;
 extern crate pairing;
 extern crate rand;
+extern crate rayon;
 extern crate test;
 
 use pairing::bls12_381::{Bls12, Fr, G1Affine, G1, G2};
 use pairing::{CurveAffine, CurveProjective, Engine, PrimeField, Wnaf};
 use rand::Rng;
+use rayon::prelude::*;
 
-pub struct PrivateKey(Fr);
+pub struct PrivateKey {
+    key: Fr,
+}
 pub struct PublicKey(G1);
 pub struct Signature(G2);
 
@@ -18,39 +22,49 @@ impl PrivateKey {
     pub fn generate<R: Rng>(rng: &mut R) -> Self {
         // TODO: probably some better way to derive than just a random field element, but maybe
         // this is enough?
-        PrivateKey(rng.gen())
+        let key: Fr = rng.gen();
+
+        PrivateKey { key }
     }
 
     /// Sign the given message.
     /// Calculated by `signature = hash_into_g2(message) * sk`
     pub fn sign(&self, message: &[u8]) -> Signature {
         // TODO: cache these
-        // TODO: determine the right window size
         let g = G2::hash(message);
-        let sk = self.0.into_repr();
 
         // compute g * sk
-        let mut wnaf = Wnaf::new();
-        Signature(wnaf.scalar(sk).base(g))
+        let sk = self.key.into_repr();
+        Signature(Wnaf::new().scalar(sk).base(g))
     }
 
     /// Get the public key for this private key.
     /// Calculated by `pk = g1 * sk`.
     pub fn public_key(&self) -> PublicKey {
-        // TODO: cache?
-        let sk = self.0.into_repr();
-        let mut wnaf = Wnaf::new();
-        PublicKey(wnaf.scalar(sk).base(G1::one()))
+        let sk = self.key.into_repr();
+        PublicKey(Wnaf::new().scalar(sk).base(G1::one()))
     }
 }
 
 /// Aggregate signatures by multiplying them together.
 /// Calculated by `signature = \sum_{i = 0}^n signature_i`.
 pub fn aggregate_signatures(signatures: &[Signature]) -> Signature {
-    let mut res = G2::zero();
-    for signature in signatures {
-        res.add_assign(&signature.0);
-    }
+    let res = signatures
+        .into_par_iter()
+        .fold(
+            || G2::zero(),
+            |mut acc, signature| {
+                acc.add_assign(&signature.0);
+                acc
+            },
+        )
+        .reduce(
+            || G2::zero(),
+            |mut acc, val| {
+                acc.add_assign(&val);
+                acc
+            },
+        );
 
     Signature(res)
 }
@@ -60,16 +74,13 @@ pub fn aggregate_signatures(signatures: &[Signature]) -> Signature {
 pub fn verify(signature: &Signature, hashes: &[G2], public_keys: &[PublicKey]) -> bool {
     assert_eq!(hashes.len(), public_keys.len());
 
-    let lhs = G1Affine::one().pairing_with(&signature.0.into_affine());
-
-    // TODO: investigate multithreading
     // TODO: implement full combination as chia does
     let prepared_keys = public_keys
-        .iter()
+        .par_iter()
         .map(|pk| pk.0.into_affine().prepare())
         .collect::<Vec<_>>();
     let prepared_hashes = hashes
-        .iter()
+        .par_iter()
         .map(|h| h.into_affine().prepare())
         .collect::<Vec<_>>();
 
@@ -78,9 +89,8 @@ pub fn verify(signature: &Signature, hashes: &[G2], public_keys: &[PublicKey]) -
         .zip(prepared_hashes.iter())
         .collect::<Vec<_>>();
 
-    let rhs = Bls12::final_exponentiation(&Bls12::miller_loop(&prepared)).unwrap();
-
-    lhs == rhs
+    G1Affine::one().pairing_with(&signature.0.into_affine())
+        == Bls12::final_exponentiation(&Bls12::miller_loop(&prepared)).unwrap()
 }
 
 #[cfg(test)]

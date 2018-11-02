@@ -8,3 +8,4 @@ edition = "2018"
 pairing = { git = "https://github.com/mmaker/pairing", rev = "a3bbecefe6c5d2f15c7126ea8b84930053929f20" }
 ff = "0.4"
 rand = "0.4"
+rayon = "*"
