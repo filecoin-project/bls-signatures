@@ -1,6 +1,6 @@
 use failure::Error;
-use pairing::bls12_381::{Bls12, G1Affine, G2Affine, G2Compressed, G2};
-use pairing::{CurveAffine, CurveProjective, EncodedPoint, Engine};
+use pairing::bls12_381::{Bls12, Fq12, G1Affine, G2Affine, G2Compressed, G2};
+use pairing::{CurveAffine, CurveProjective, EncodedPoint, Engine, Field};
 use rayon::prelude::*;
 
 use super::key::*;
@@ -70,23 +70,27 @@ pub fn aggregate(signatures: &[Signature]) -> Signature {
 pub fn verify(signature: &Signature, hashes: &[G2], public_keys: &[PublicKey]) -> bool {
     assert_eq!(hashes.len(), public_keys.len());
 
-    // TODO: implement full combination as chia does
-    let prepared_keys = public_keys
+    let mut prepared_keys = public_keys
         .par_iter()
         .map(|pk| pk.into_affine().prepare())
         .collect::<Vec<_>>();
-    let prepared_hashes = hashes
+
+    let mut g1_neg = G1Affine::one();
+    g1_neg.negate();
+    prepared_keys.push(g1_neg.prepare());
+
+    let mut prepared_hashes = hashes
         .par_iter()
         .map(|h| h.into_affine().prepare())
         .collect::<Vec<_>>();
+    prepared_hashes.push(signature.0.prepare());
 
     let prepared = prepared_keys
         .iter()
         .zip(prepared_hashes.iter())
         .collect::<Vec<_>>();
 
-    G1Affine::one().pairing_with(&signature.0)
-        == Bls12::final_exponentiation(&Bls12::miller_loop(&prepared)).unwrap()
+    Fq12::one() == Bls12::final_exponentiation(&Bls12::miller_loop(&prepared)).unwrap()
 }
 
 #[cfg(test)]
