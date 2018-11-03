@@ -19,11 +19,10 @@ macro_rules! measure {
         $code;
 
         duration += start.elapsed();
-        println!(
-            "\t  took {}.{}s",
-            duration.as_secs(),
-            duration.subsec_millis(),
-        );
+        let total =
+            { f64::from(duration.subsec_nanos()) / 1_000_000_000f64 + (duration.as_secs() as f64) };
+
+        println!("\t  took {:.6}s", total);
     };
     ($name:expr, $num:expr, $code:block) => {
         println!("\t{}", $name);
@@ -33,17 +32,15 @@ macro_rules! measure {
         $code;
 
         duration += start.elapsed();
+
+        let total =
+            { f64::from(duration.subsec_nanos()) / 1_000_000_000f64 + (duration.as_secs() as f64) };
         let per_msg = {
             let avg = duration / $num as u32;
             f64::from(avg.subsec_nanos()) / 1_000_000f64 + (avg.as_secs() as f64 * 1000f64)
         };
 
-        println!(
-            "\t  took {}.{}s ({}ms per message)",
-            duration.as_secs(),
-            duration.subsec_millis(),
-            per_msg,
-        );
+        println!("\t  took {:.6}s ({:.3}ms per message)", total, per_msg);
     };
 }
 
