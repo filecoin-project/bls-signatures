@@ -6,8 +6,6 @@ extern crate rayon;
 use std::time::{Duration, Instant};
 
 use bls_signatures::*;
-use pairing::bls12_381::G2;
-use pairing::CurveProjective;
 use rand::{Rng, SeedableRng, XorShiftRng};
 use rayon::prelude::*;
 
@@ -35,11 +33,11 @@ fn main() {
         .collect::<Vec<Signature>>();
 
     println!("aggregating signatures");
-    let aggregated_signature = aggregate_signatures(&sigs);
+    let aggregated_signature = aggregate(&sigs);
 
     let hashes = messages
         .par_iter()
-        .map(|message| G2::hash(message))
+        .map(|message| hash(message))
         .collect::<Vec<_>>();
     let public_keys = private_keys
         .par_iter()
