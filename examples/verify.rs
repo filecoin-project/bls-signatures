@@ -6,15 +6,34 @@ extern crate rayon;
 use std::time::{Duration, Instant};
 
 use bls_signatures::*;
+use pairing::bls12_381::G2;
 use rand::{Rng, SeedableRng, XorShiftRng};
 use rayon::prelude::*;
+
+macro_rules! measure {
+    ($name:expr, $code:block) => {
+        println!("\t{}", $name);
+        let start = Instant::now();
+        let mut duration = Duration::new(0, 0);
+
+        $code;
+
+        duration += start.elapsed();
+        println!(
+            "\t  took {}.{}s",
+            duration.as_secs(),
+            duration.subsec_millis()
+        );
+    };
+}
 
 fn main() {
     let rng = &mut XorShiftRng::from_seed([0x3dbe6259, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
     let num_messages = 10_000;
 
+    println!("dancing with {} messages", num_messages);
+
     // generate private keys
-    println!("creating keys");
     let private_keys: Vec<_> = (0..num_messages)
         .map(|_| PrivateKey::generate(rng))
         .collect();
@@ -25,36 +44,36 @@ fn main() {
         .collect();
 
     // sign messages
-    println!("signing messages");
-    let sigs = messages
-        .par_iter()
-        .zip(private_keys.par_iter())
-        .map(|(message, pk)| pk.sign(message))
-        .collect::<Vec<Signature>>();
+    let sigs: Vec<Signature>;
+    measure!("signing", {
+        sigs = messages
+            .par_iter()
+            .zip(private_keys.par_iter())
+            .map(|(message, pk)| pk.sign(message))
+            .collect::<Vec<Signature>>();
+    });
 
-    println!("aggregating signatures");
-    let aggregated_signature = aggregate(&sigs);
+    let aggregated_signature: Signature;
+    measure!("aggregate signatures", {
+        aggregated_signature = aggregate(&sigs);
+    });
 
-    let hashes = messages
-        .par_iter()
-        .map(|message| hash(message))
-        .collect::<Vec<_>>();
-    let public_keys = private_keys
-        .par_iter()
-        .map(|pk| pk.public_key())
-        .collect::<Vec<_>>();
+    let hashes: Vec<G2>;
+    measure!("hashing messages", {
+        hashes = messages
+            .par_iter()
+            .map(|message| hash(message))
+            .collect::<Vec<_>>();
+    });
+    let public_keys: Vec<PublicKey>;
+    measure!("extracting public keys", {
+        public_keys = private_keys
+            .par_iter()
+            .map(|pk| pk.public_key())
+            .collect::<Vec<_>>();
+    });
 
-    println!("verifying aggregated signatures");
-    let mut duration = Duration::new(0, 0);
-    let start = Instant::now();
-
-    assert!(verify(&aggregated_signature, &hashes, &public_keys));
-
-    duration += start.elapsed();
-
-    println!(
-        "verification took {:?}s for {} signatures",
-        duration.as_secs(),
-        num_messages
-    );
+    measure!("verification", {
+        assert!(verify(&aggregated_signature, &hashes, &public_keys));
+    });
 }
