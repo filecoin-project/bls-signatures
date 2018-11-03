@@ -3,19 +3,25 @@ use std::io::Cursor;
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use failure::Error;
 use pairing::bls12_381::{Fr, FrRepr, G1Affine, G1Compressed, G1};
-use pairing::{CurveAffine, CurveProjective, EncodedPoint, PrimeField, Wnaf};
+use pairing::{CurveProjective, EncodedPoint, PrimeField, Wnaf};
 use rand::Rng;
 
 use super::signature::*;
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct PublicKey(G1);
+pub struct PublicKey(G1Affine);
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct PrivateKey(Fr);
 
 impl From<G1> for PublicKey {
     fn from(val: G1) -> Self {
+        PublicKey(val.into_affine())
+    }
+}
+
+impl From<G1Affine> for PublicKey {
+    fn from(val: G1Affine) -> Self {
         PublicKey(val)
     }
 }
@@ -87,9 +93,7 @@ impl PrivateKey {
 
 impl PublicKey {
     pub fn as_bytes(&self) -> Vec<u8> {
-        G1Compressed::from_affine(self.into_affine())
-            .as_ref()
-            .to_vec()
+        G1Compressed::from_affine(self.0).as_ref().to_vec()
     }
 
     pub fn from_bytes(raw: &[u8]) -> Result<Self, Error> {
@@ -100,11 +104,11 @@ impl PublicKey {
         let mut res = G1Compressed::empty();
         res.as_mut().copy_from_slice(raw);
 
-        Ok(res.into_affine()?.into_projective().into())
+        Ok(res.into_affine()?.into())
     }
 
     pub fn into_affine(&self) -> G1Affine {
-        self.0.into_affine()
+        self.0
     }
 }
 

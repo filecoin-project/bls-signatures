@@ -1,24 +1,28 @@
 use failure::Error;
-use pairing::bls12_381::{Bls12, G1Affine, G2Compressed, G2};
+use pairing::bls12_381::{Bls12, G1Affine, G2Affine, G2Compressed, G2};
 use pairing::{CurveAffine, CurveProjective, EncodedPoint, Engine};
 use rayon::prelude::*;
 
 use super::key::*;
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct Signature(G2);
+pub struct Signature(G2Affine);
 
 impl From<G2> for Signature {
     fn from(val: G2) -> Self {
+        Signature(val.into_affine())
+    }
+}
+
+impl From<G2Affine> for Signature {
+    fn from(val: G2Affine) -> Self {
         Signature(val)
     }
 }
 
 impl Signature {
     pub fn as_bytes(&self) -> Vec<u8> {
-        G2Compressed::from_affine(self.0.into_affine())
-            .as_ref()
-            .to_vec()
+        G2Compressed::from_affine(self.0).as_ref().to_vec()
     }
 
     pub fn from_bytes(raw: &[u8]) -> Result<Self, Error> {
@@ -29,7 +33,7 @@ impl Signature {
         let mut res = G2Compressed::empty();
         res.as_mut().copy_from_slice(raw);
 
-        Ok(res.into_affine()?.into_projective().into())
+        Ok(res.into_affine()?.into())
     }
 }
 
@@ -46,7 +50,7 @@ pub fn aggregate(signatures: &[Signature]) -> Signature {
         .fold(
             || G2::zero(),
             |mut acc, signature| {
-                acc.add_assign(&signature.0);
+                acc.add_assign(&signature.0.into_projective());
                 acc
             },
         )
@@ -58,7 +62,7 @@ pub fn aggregate(signatures: &[Signature]) -> Signature {
             },
         );
 
-    Signature(res)
+    Signature(res.into_affine())
 }
 
 /// Verifies that the signature is the actual aggregated signature of hashes - pubkeys.
@@ -81,7 +85,7 @@ pub fn verify(signature: &Signature, hashes: &[G2], public_keys: &[PublicKey]) -
         .zip(prepared_hashes.iter())
         .collect::<Vec<_>>();
 
-    G1Affine::one().pairing_with(&signature.0.into_affine())
+    G1Affine::one().pairing_with(&signature.0)
         == Bls12::final_exponentiation(&Bls12::miller_loop(&prepared)).unwrap()
 }
 
