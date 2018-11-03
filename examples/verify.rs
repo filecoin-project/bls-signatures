@@ -58,6 +58,21 @@ fn main() {
         aggregated_signature = aggregate(&sigs);
     });
 
+    let serialized_signatures: Vec<_>;
+    measure!("serialize signatures", {
+        serialized_signatures = sigs.par_iter().map(|s| s.as_bytes()).collect();
+    });
+
+    let deserialized_signatures: Vec<_>;
+    measure!("deserialize signatures", {
+        deserialized_signatures = serialized_signatures
+            .par_iter()
+            .map(|s| Signature::from_bytes(s).unwrap())
+            .collect();
+    });
+
+    assert_eq!(deserialized_signatures.len(), sigs.len());
+
     let hashes: Vec<G2>;
     measure!("hashing messages", {
         hashes = messages
