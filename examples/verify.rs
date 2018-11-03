@@ -58,20 +58,10 @@ fn main() {
         aggregated_signature = aggregate(&sigs);
     });
 
-    let serialized_signatures: Vec<_>;
-    measure!("serialize signatures", {
-        serialized_signatures = sigs.par_iter().map(|s| s.as_bytes()).collect();
+    let serialized_signature: Vec<_>;
+    measure!("serialize signature", {
+        serialized_signature = aggregated_signature.as_bytes();
     });
-
-    let deserialized_signatures: Vec<_>;
-    measure!("deserialize signatures", {
-        deserialized_signatures = serialized_signatures
-            .par_iter()
-            .map(|s| Signature::from_bytes(s).unwrap())
-            .collect();
-    });
-
-    assert_eq!(deserialized_signatures.len(), sigs.len());
 
     let hashes: Vec<G2>;
     measure!("hashing messages", {
@@ -88,7 +78,12 @@ fn main() {
             .collect::<Vec<_>>();
     });
 
+    let agg_sig: Signature;
+    measure!("deserialize signature", {
+        agg_sig = Signature::from_bytes(&serialized_signature).unwrap();
+    });
+
     measure!("verification", {
-        assert!(verify(&aggregated_signature, &hashes, &public_keys));
+        assert!(verify(&agg_sig, &hashes, &public_keys));
     });
 }
