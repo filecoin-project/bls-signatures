@@ -1,10 +1,17 @@
-use pairing::bls12_381::{Fr, FrRepr, G1Affine, G1};
-use pairing::{CurveProjective, PrimeField, Wnaf};
+use std::io::Cursor;
+
+use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
+use failure::Error;
+use pairing::bls12_381::{Fr, FrRepr, G1Affine, G1Compressed, G1};
+use pairing::{CurveAffine, CurveProjective, EncodedPoint, PrimeField, Wnaf};
 use rand::Rng;
 
 use super::signature::*;
 
+#[derive(Debug, Clone, PartialEq)]
 pub struct PublicKey(G1);
+
+#[derive(Debug, Clone, PartialEq)]
 pub struct PrivateKey(Fr);
 
 impl From<G1> for PublicKey {
@@ -25,8 +32,8 @@ impl From<PrivateKey> for FrRepr {
     }
 }
 
-impl From<&PrivateKey> for FrRepr {
-    fn from(val: &PrivateKey) -> Self {
+impl<'a> From<&'a PrivateKey> for FrRepr {
+    fn from(val: &'a PrivateKey) -> Self {
         val.0.into_repr()
     }
 }
@@ -56,10 +63,70 @@ impl PrivateKey {
     pub fn public_key(&self) -> PublicKey {
         Wnaf::new().scalar(self.into()).base(G1::one()).into()
     }
+
+    pub fn as_bytes(&self) -> Vec<u8> {
+        let mut res = Vec::with_capacity(8 * 4);
+
+        for digit in self.0.into_repr().as_ref().iter() {
+            res.write_u64::<LittleEndian>(*digit).unwrap();
+        }
+
+        res
+    }
+
+    pub fn from_bytes(raw: &[u8]) -> Result<Self, Error> {
+        let mut res = FrRepr::default();
+        let mut reader = Cursor::new(raw);
+        for digit in res.0.as_mut().iter_mut() {
+            *digit = reader.read_u64::<LittleEndian>()?;
+        }
+
+        Ok(Fr::from_repr(res)?.into())
+    }
 }
 
 impl PublicKey {
+    pub fn as_bytes(&self) -> Vec<u8> {
+        G1Compressed::from_affine(self.into_affine())
+            .as_ref()
+            .to_vec()
+    }
+
+    pub fn from_bytes(raw: &[u8]) -> Result<Self, Error> {
+        if raw.len() != G1Compressed::size() {
+            return Err(format_err!("size missmatch"));
+        }
+
+        let mut res = G1Compressed::empty();
+        res.as_mut().copy_from_slice(raw);
+
+        Ok(res.into_affine()?.into_projective().into())
+    }
+
     pub fn into_affine(&self) -> G1Affine {
         self.0.into_affine()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use rand::{SeedableRng, XorShiftRng};
+
+    #[test]
+    fn test_bytes_roundtrip() {
+        let rng = &mut XorShiftRng::from_seed([0x3dbe6259, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
+        let sk = PrivateKey::generate(rng);
+        let sk_bytes = sk.as_bytes();
+
+        assert_eq!(sk_bytes.len(), 32);
+        assert_eq!(PrivateKey::from_bytes(&sk_bytes).unwrap(), sk);
+
+        let pk = sk.public_key();
+        let pk_bytes = pk.as_bytes();
+
+        assert_eq!(pk_bytes.len(), 48);
+        assert_eq!(PublicKey::from_bytes(&pk_bytes).unwrap(), pk);
     }
 }

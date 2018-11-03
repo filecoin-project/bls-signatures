@@ -1,3 +1,6 @@
+extern crate byteorder;
+#[macro_use]
+extern crate failure;
 extern crate ff;
 extern crate pairing;
 extern crate rand;

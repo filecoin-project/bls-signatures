@@ -1,14 +1,35 @@
-use pairing::bls12_381::{Bls12, G1Affine, G2};
-use pairing::{CurveAffine, CurveProjective, Engine};
+use failure::Error;
+use pairing::bls12_381::{Bls12, G1Affine, G2Compressed, G2};
+use pairing::{CurveAffine, CurveProjective, EncodedPoint, Engine};
 use rayon::prelude::*;
 
 use super::key::*;
 
+#[derive(Debug, Clone, PartialEq)]
 pub struct Signature(G2);
 
 impl From<G2> for Signature {
     fn from(val: G2) -> Self {
         Signature(val)
+    }
+}
+
+impl Signature {
+    pub fn as_bytes(&self) -> Vec<u8> {
+        G2Compressed::from_affine(self.0.into_affine())
+            .as_ref()
+            .to_vec()
+    }
+
+    pub fn from_bytes(raw: &[u8]) -> Result<Self, Error> {
+        if raw.len() != G2Compressed::size() {
+            return Err(format_err!("size missmatch"));
+        }
+
+        let mut res = G2Compressed::empty();
+        res.as_mut().copy_from_slice(raw);
+
+        Ok(res.into_affine()?.into_projective().into())
     }
 }
 
@@ -66,7 +87,6 @@ pub fn verify(signature: &Signature, hashes: &[G2], public_keys: &[PublicKey]) -
 
 #[cfg(test)]
 mod tests {
-    use super::super::key::*;
     use super::*;
 
     use rand::{Rng, SeedableRng, XorShiftRng};
@@ -109,5 +129,18 @@ mod tests {
             verify(&aggregated_signature, &hashes, &public_keys),
             "failed to verify"
         );
+    }
+
+    #[test]
+    fn test_bytes_roundtrip() {
+        let rng = &mut XorShiftRng::from_seed([0x3dbe6259, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
+        let sk = PrivateKey::generate(rng);
+
+        let msg = (0..64).map(|_| rng.gen()).collect::<Vec<u8>>();
+        let signature = sk.sign(&msg);
+
+        let signature_bytes = signature.as_bytes();
+        assert_eq!(signature_bytes.len(), 96);
+        assert_eq!(Signature::from_bytes(&signature_bytes).unwrap(), signature);
     }
 }
