@@ -6,7 +6,7 @@ extern crate rayon;
 use std::time::{Duration, Instant};
 
 use bls_signatures::*;
-use pairing::bls12_381::G2;
+use pairing::bls12_381::G1;
 use rand::{Rng, SeedableRng, XorShiftRng};
 use rayon::prelude::*;
 
@@ -79,7 +79,7 @@ fn run(num_messages: usize) {
         serialized_signature = aggregated_signature.as_bytes();
     });
 
-    let hashes: Vec<G2>;
+    let hashes: Vec<G1>;
     measure!("hashing messages", num_messages, {
         hashes = messages
             .par_iter()

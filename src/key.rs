@@ -2,26 +2,26 @@ use std::io::Cursor;
 
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use failure::Error;
-use pairing::bls12_381::{Fr, FrRepr, G1Affine, G1Compressed, G1};
+use pairing::bls12_381::{Fr, FrRepr, G2Affine, G2Compressed, G2};
 use pairing::{CurveProjective, EncodedPoint, PrimeField, Wnaf};
 use rand::Rng;
 
 use super::signature::*;
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct PublicKey(G1Affine);
+pub struct PublicKey(G2Affine);
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct PrivateKey(Fr);
 
-impl From<G1> for PublicKey {
-    fn from(val: G1) -> Self {
+impl From<G2> for PublicKey {
+    fn from(val: G2) -> Self {
         PublicKey(val.into_affine())
     }
 }
 
-impl From<G1Affine> for PublicKey {
-    fn from(val: G1Affine) -> Self {
+impl From<G2Affine> for PublicKey {
+    fn from(val: G2Affine) -> Self {
         PublicKey(val)
     }
 }
@@ -67,7 +67,7 @@ impl PrivateKey {
     /// Get the public key for this private key.
     /// Calculated by `pk = g1 * sk`.
     pub fn public_key(&self) -> PublicKey {
-        Wnaf::new().scalar(self.into()).base(G1::one()).into()
+        Wnaf::new().scalar(self.into()).base(G2::one()).into()
     }
 
     pub fn as_bytes(&self) -> Vec<u8> {
@@ -93,21 +93,21 @@ impl PrivateKey {
 
 impl PublicKey {
     pub fn as_bytes(&self) -> Vec<u8> {
-        G1Compressed::from_affine(self.0).as_ref().to_vec()
+        G2Compressed::from_affine(self.0).as_ref().to_vec()
     }
 
     pub fn from_bytes(raw: &[u8]) -> Result<Self, Error> {
-        if raw.len() != G1Compressed::size() {
+        if raw.len() != G2Compressed::size() {
             return Err(format_err!("size missmatch"));
         }
 
-        let mut res = G1Compressed::empty();
+        let mut res = G2Compressed::empty();
         res.as_mut().copy_from_slice(raw);
 
         Ok(res.into_affine()?.into())
     }
 
-    pub fn into_affine(&self) -> G1Affine {
+    pub fn into_affine(&self) -> G2Affine {
         self.0
     }
 }
@@ -130,7 +130,7 @@ mod tests {
         let pk = sk.public_key();
         let pk_bytes = pk.as_bytes();
 
-        assert_eq!(pk_bytes.len(), 48);
+        assert_eq!(pk_bytes.len(), 96);
         assert_eq!(PublicKey::from_bytes(&pk_bytes).unwrap(), pk);
     }
 }

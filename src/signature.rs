@@ -1,36 +1,36 @@
 use failure::Error;
-use pairing::bls12_381::{Bls12, Fq12, G1Affine, G2Affine, G2Compressed, G2};
+use pairing::bls12_381::{Bls12, Fq12, G1Affine, G1Compressed, G2Affine, G1};
 use pairing::{CurveAffine, CurveProjective, EncodedPoint, Engine, Field};
 use rayon::prelude::*;
 
 use super::key::*;
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct Signature(G2Affine);
+pub struct Signature(G1Affine);
 
-impl From<G2> for Signature {
-    fn from(val: G2) -> Self {
+impl From<G1> for Signature {
+    fn from(val: G1) -> Self {
         Signature(val.into_affine())
     }
 }
 
-impl From<G2Affine> for Signature {
-    fn from(val: G2Affine) -> Self {
+impl From<G1Affine> for Signature {
+    fn from(val: G1Affine) -> Self {
         Signature(val)
     }
 }
 
 impl Signature {
     pub fn as_bytes(&self) -> Vec<u8> {
-        G2Compressed::from_affine(self.0).as_ref().to_vec()
+        G1Compressed::from_affine(self.0).as_ref().to_vec()
     }
 
     pub fn from_bytes(raw: &[u8]) -> Result<Self, Error> {
-        if raw.len() != G2Compressed::size() {
+        if raw.len() != G1Compressed::size() {
             return Err(format_err!("size missmatch"));
         }
 
-        let mut res = G2Compressed::empty();
+        let mut res = G1Compressed::empty();
         res.as_mut().copy_from_slice(raw);
 
         Ok(res.into_affine()?.into())
@@ -38,8 +38,8 @@ impl Signature {
 }
 
 /// Hash the given message, as used in the signature.
-pub fn hash(msg: &[u8]) -> G2 {
-    G2::hash(msg)
+pub fn hash(msg: &[u8]) -> G1 {
+    G1::hash(msg)
 }
 
 /// Aggregate signatures by multiplying them together.
@@ -48,14 +48,14 @@ pub fn aggregate(signatures: &[Signature]) -> Signature {
     let res = signatures
         .into_par_iter()
         .fold(
-            || G2::zero(),
+            || G1::zero(),
             |mut acc, signature| {
                 acc.add_assign(&signature.0.into_projective());
                 acc
             },
         )
         .reduce(
-            || G2::zero(),
+            || G1::zero(),
             |mut acc, val| {
                 acc.add_assign(&val);
                 acc
@@ -67,7 +67,7 @@ pub fn aggregate(signatures: &[Signature]) -> Signature {
 
 /// Verifies that the signature is the actual aggregated signature of hashes - pubkeys.
 /// Calculated by `e(g1, signature) == \prod_{i = 0}^n e(pk_i, hash_i)`.
-pub fn verify(signature: &Signature, hashes: &[G2], public_keys: &[PublicKey]) -> bool {
+pub fn verify(signature: &Signature, hashes: &[G1], public_keys: &[PublicKey]) -> bool {
     assert_eq!(hashes.len(), public_keys.len());
 
     let mut prepared_keys = public_keys
@@ -75,9 +75,9 @@ pub fn verify(signature: &Signature, hashes: &[G2], public_keys: &[PublicKey]) -
         .map(|pk| pk.into_affine().prepare())
         .collect::<Vec<_>>();
 
-    let mut g1_neg = G1Affine::one();
-    g1_neg.negate();
-    prepared_keys.push(g1_neg.prepare());
+    let mut g2_neg = G2Affine::one();
+    g2_neg.negate();
+    prepared_keys.push(g2_neg.prepare());
 
     let mut prepared_hashes = hashes
         .par_iter()
@@ -85,9 +85,9 @@ pub fn verify(signature: &Signature, hashes: &[G2], public_keys: &[PublicKey]) -
         .collect::<Vec<_>>();
     prepared_hashes.push(signature.0.prepare());
 
-    let prepared = prepared_keys
+    let prepared = prepared_hashes
         .iter()
-        .zip(prepared_hashes.iter())
+        .zip(prepared_keys.iter())
         .collect::<Vec<_>>();
 
     Fq12::one() == Bls12::final_exponentiation(&Bls12::miller_loop(&prepared)).unwrap()
@@ -126,7 +126,7 @@ mod tests {
 
         let hashes = messages
             .iter()
-            .map(|message| G2::hash(message))
+            .map(|message| G1::hash(message))
             .collect::<Vec<_>>();
         let public_keys = private_keys
             .iter()
@@ -148,7 +148,7 @@ mod tests {
         let signature = sk.sign(&msg);
 
         let signature_bytes = signature.as_bytes();
-        assert_eq!(signature_bytes.len(), 96);
+        assert_eq!(signature_bytes.len(), 48);
         assert_eq!(Signature::from_bytes(&signature_bytes).unwrap(), signature);
     }
 }
