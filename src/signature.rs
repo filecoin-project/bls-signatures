@@ -1,9 +1,9 @@
-use failure::Error;
+use failure::{format_err, Error};
 use pairing::bls12_381::{Bls12, Fq12, G1Affine, G2Affine, G2Compressed, G2};
 use pairing::{CurveAffine, CurveProjective, EncodedPoint, Engine, Field};
 use rayon::prelude::*;
 
-use super::key::*;
+use crate::key::*;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Signature(G2Affine);
@@ -47,20 +47,14 @@ pub fn hash(msg: &[u8]) -> G2 {
 pub fn aggregate(signatures: &[Signature]) -> Signature {
     let res = signatures
         .into_par_iter()
-        .fold(
-            || G2::zero(),
-            |mut acc, signature| {
-                acc.add_assign(&signature.0.into_projective());
-                acc
-            },
-        )
-        .reduce(
-            || G2::zero(),
-            |mut acc, val| {
-                acc.add_assign(&val);
-                acc
-            },
-        );
+        .fold(G2::zero, |mut acc, signature| {
+            acc.add_assign(&signature.0.into_projective());
+            acc
+        })
+        .reduce(G2::zero, |mut acc, val| {
+            acc.add_assign(&val);
+            acc
+        });
 
     Signature(res.into_affine())
 }
@@ -72,7 +66,7 @@ pub fn verify(signature: &Signature, hashes: &[G2], public_keys: &[PublicKey]) -
 
     let mut prepared_keys = public_keys
         .par_iter()
-        .map(|pk| pk.into_affine().prepare())
+        .map(|pk| pk.as_affine().prepare())
         .collect::<Vec<_>>();
 
     let mut g1_neg = G1Affine::one();

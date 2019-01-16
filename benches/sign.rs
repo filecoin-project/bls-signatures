@@ -1,14 +1,9 @@
 #![feature(test)]
-
-extern crate bls_signatures;
-extern crate pairing;
-extern crate rand;
 extern crate test;
-
-use self::test::Bencher;
 
 use bls_signatures::*;
 use rand::{Rng, SeedableRng, XorShiftRng};
+use test::Bencher;
 
 #[bench]
 fn sign_64b(b: &mut Bencher) {
