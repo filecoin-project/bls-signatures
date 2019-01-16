@@ -1,7 +1,7 @@
 use std::io::Cursor;
 
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
-use failure::Error;
+use failure::{format_err, Error};
 use pairing::bls12_381::{Fr, FrRepr, G1Affine, G1Compressed, G1};
 use pairing::{CurveProjective, EncodedPoint, PrimeField, Wnaf};
 use rand::Rng;
@@ -107,7 +107,7 @@ impl PublicKey {
         Ok(res.into_affine()?.into())
     }
 
-    pub fn into_affine(&self) -> G1Affine {
+    pub fn as_affine(&self) -> G1Affine {
         self.0
     }
 }
