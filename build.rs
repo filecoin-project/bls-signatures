@@ -4,6 +4,7 @@ use std::env;
 use std::fs::File;
 use std::io::Write;
 use std::path::PathBuf;
+use std::process::Command;
 
 const VERSION: &'static str = env!("CARGO_PKG_VERSION");
 
@@ -33,20 +34,32 @@ fn main() {
         }
     }
 
+    let git_output = Command::new("git")
+        .args(&["rev-parse", "HEAD"])
+        .output()
+        .unwrap();
+    let git_hash = String::from_utf8(git_output.stdout).unwrap();
+
+    let libs = if cfg!(target_os = "linux") {
+        "-lutil -lutil -ldl -lrt -lpthread -lgcc_s -lc -lm -lrt -lpthread -lutil -lutil"
+    } else if cfg!(target_os = "macos") {
+        "-framework Security -lSystem -lresolv -lc -lm"
+    } else {
+        ""
+    };
+
     let mut pc_file = File::create(target_path.join("libbls_signatures.pc"))
         .expect("unable to generate .pc file: {:?}");
 
     write!(
         pc_file,
-        "prefix=/usr/local
-libdir=${{prefix}}/lib
-includedir=${{prefix}}/include
-
-Name: libbls_signatures
-Version: foo
+        "Name: libbls_signatures
+Version: {version}
 Description: bls-signatures library
-Libs: -L${{libdir}} -lbls_signatures -lSystem -lresolv -lc -lm
-Cflags: -I${{includedir}}
-")
+Libs: {libs}
+",
+        version = git_hash.trim(),
+        libs = libs
+    )
     .expect("unable to write to .pc file: {:?}");
 }
