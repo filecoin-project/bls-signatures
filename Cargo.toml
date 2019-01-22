@@ -3,8 +3,10 @@ name = "bls-signatures"
 version = "0.1.0"
 authors = ["dignifiedquire <dignifiedquire@gmail.com>"]
 license = "MIT OR Apache-2.0"
-
 edition = "2018"
+
+[lib]
+crate-type = ["rlib", "staticlib"]
 
 [dependencies]
 ff = "0.4"
@@ -12,6 +14,10 @@ rand = "0.4"
 rayon = "1"
 byteorder = "1.2"
 failure = "0.1"
+libc = "0.2"
+
+[build-dependencies]
+cbindgen = "0.6.8"
 
 [dependencies.pairing]
 git = "https://github.com/dignifiedquire/pairing"
