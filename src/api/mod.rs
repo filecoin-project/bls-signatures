@@ -1,8 +1,8 @@
 use libc;
 
+use crate::key::{PrivateKey, PublicKey};
 use crate::signature;
 use crate::signature::Signature;
-use crate::key::{PrivateKey, PublicKey};
 
 use pairing::bls12_381::{G2Compressed, G2};
 use pairing::{CurveAffine, CurveProjective, EncodedPoint};
@@ -49,9 +49,7 @@ pub unsafe extern "C" fn hash(
     let compressed_digest_slice = compressed_digest.as_ref();
     raw_digest.copy_from_slice(compressed_digest_slice);
 
-    let response = HashResponse {
-        digest: raw_digest,
-    };
+    let response = HashResponse { digest: raw_digest };
 
     mem::forget(&response);
 
@@ -290,5 +288,3 @@ pub unsafe extern "C" fn private_key_public_key(
 
     Box::into_raw(Box::new(response))
 }
-
-

@@ -18,7 +18,10 @@ fn main() {
     let c = cbindgen::Builder::new()
         .with_config(cfg)
         .with_crate(crate_dir)
-        .with_header(format!("/* libbls_signatures Header Version {} */", VERSION))
+        .with_header(format!(
+            "/* libbls_signatures Header Version {} */",
+            VERSION
+        ))
         .with_language(cbindgen::Language::C)
         .generate();
 
