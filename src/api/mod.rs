@@ -98,6 +98,7 @@ pub unsafe extern "C" fn aggregate(
 }
 
 /// Verify that a signature is the aggregated signature of hashes - pubkeys
+/// WARNING: This function can panic if there are a different number of digests and keys
 ///
 /// # Arguments
 ///

@@ -46,7 +46,7 @@ fn main() {
     let libs = if cfg!(target_os = "linux") {
         "-lutil -lutil -ldl -lrt -lpthread -lgcc_s -lc -lm -lrt -lpthread -lutil -lutil"
     } else if cfg!(target_os = "macos") {
-        "-framework Security -lSystem -lresolv -lc -lm"
+        "-lSystem -lresolv -lc -lm"
     } else {
         ""
     };
@@ -56,9 +56,9 @@ fn main() {
 
     write!(
         pc_file,
-        "Name: libbls_signatures
+        "Name: bls signatures
 Version: {version}
-Description: bls-signatures library
+Description: bls signature scheme library
 Libs: {libs}
 ",
         version = git_hash.trim(),
