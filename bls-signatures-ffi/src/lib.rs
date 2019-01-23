@@ -4,9 +4,9 @@ use rand::{SeedableRng, XorShiftRng};
 use std::mem;
 use std::slice::from_raw_parts;
 
-use crate::key::{PrivateKey, PublicKey};
-use crate::signature;
-use crate::signature::Signature;
+use bls_signatures::key::{PrivateKey, PublicKey};
+use bls_signatures::signature;
+use bls_signatures::signature::Signature;
 
 use pairing::bls12_381::{G2Compressed, G2};
 use pairing::{CurveAffine, CurveProjective, EncodedPoint};

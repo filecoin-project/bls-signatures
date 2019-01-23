@@ -1,4 +1,4 @@
-use crate::api::{BLSDigest, BLSPrivateKey, BLSPublicKey, BLSSignature};
+use crate::{BLSDigest, BLSPrivateKey, BLSPublicKey, BLSSignature};
 
 /// HashResponse
 

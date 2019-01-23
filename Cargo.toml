@@ -5,24 +5,21 @@ authors = ["dignifiedquire <dignifiedquire@gmail.com>"]
 license = "MIT OR Apache-2.0"
 edition = "2018"
 
-[lib]
-crate-type = ["staticlib"]
-
 [dependencies]
 ff = "0.4"
 rand = "0.4"
 rayon = "1"
 byteorder = "1.2"
 failure = "0.1"
-libc = "0.2"
 
-[build-dependencies]
-cbindgen = "0.6.8"
+[workspace]
+members = [
+  "bls-signatures-ffi",
+]
 
 [dependencies.pairing]
 git = "https://github.com/dignifiedquire/pairing"
 branch = "hashing"
-
 
 [features]
 default = ["pairing/u128-support"]
