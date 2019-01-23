@@ -1,3 +1,4 @@
+extern crate bindgen;
 extern crate cbindgen;
 
 use std::env;
@@ -30,6 +31,22 @@ fn main() {
     match c {
         Ok(res) => {
             res.write_to_file(target_path.join("libbls_signatures.h"));
+        }
+        Err(err) => {
+            eprintln!("unable to generate bindings: {:?}", err);
+            std::process::exit(1);
+        }
+    }
+
+    let b = bindgen::builder()
+        .header(target_path.join("libbls_signatures.h").to_string_lossy())
+        .raw_line("#[link(name = \"bls_signatures\")]\nextern \"C\" {}")
+        .generate();
+
+    match b {
+        Ok(res) => {
+            res.write_to_file(out_path.join("libbls_signatures.rs"))
+                .expect("could not write file");
         }
         Err(err) => {
             eprintln!("unable to generate bindings: {:?}", err);
