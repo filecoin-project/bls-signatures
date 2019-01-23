@@ -247,3 +247,44 @@ pub unsafe extern "C" fn private_key_public_key(
 
     Box::into_raw(Box::new(response))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn key_verification() {
+        unsafe {
+            let seed = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1];
+            let private_key = (*private_key_generate(&seed[0])).private_key;
+            let public_key = (*private_key_public_key(&private_key[0])).public_key;
+            let message = "hello world".as_bytes();
+            let digest = (*hash(&message[0], message.len())).digest;
+            let signature =
+                (*private_key_sign(&private_key[0], &message[0], message.len())).signature;
+            let verified = (*verify(
+                &signature[0],
+                &digest[0],
+                digest.len(),
+                &public_key[0],
+                public_key.len(),
+            ))
+            .result;
+
+            assert_eq!(1, verified);
+
+            let different_message = "bye world".as_bytes();
+            let different_digest = (*hash(&different_message[0], different_message.len())).digest;
+            let not_verified = (*verify(
+                &signature[0],
+                &different_digest[0],
+                different_digest.len(),
+                &public_key[0],
+                public_key.len(),
+            ))
+            .result;
+
+            assert_eq!(0, not_verified);
+        }
+    }
+}

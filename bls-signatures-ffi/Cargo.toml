@@ -18,5 +18,4 @@ git = "https://github.com/dignifiedquire/pairing"
 branch = "hashing"
 
 [build-dependencies]
-bindgen = "0.46"
 cbindgen = "0.6.8"
