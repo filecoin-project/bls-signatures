@@ -1,5 +1,9 @@
 use libc;
 
+use rand::{SeedableRng, XorShiftRng};
+use std::mem;
+use std::slice::from_raw_parts;
+
 use crate::key::{PrivateKey, PublicKey};
 use crate::signature;
 use crate::signature::Signature;
@@ -7,9 +11,7 @@ use crate::signature::Signature;
 use pairing::bls12_381::{G2Compressed, G2};
 use pairing::{CurveAffine, CurveProjective, EncodedPoint};
 
-use rand::{SeedableRng, XorShiftRng};
-use std::mem;
-use std::slice::from_raw_parts;
+pub mod responses;
 
 const SIGNATURE_BYTES: usize = 96;
 const PRIVATE_KEY_BYTES: usize = 32;
@@ -21,11 +23,6 @@ type BLSPrivateKey = [u8; PRIVATE_KEY_BYTES];
 type BLSPublicKey = [u8; PUBLIC_KEY_BYTES];
 type BLSDigest = [u8; DIGEST_BYTES];
 
-#[repr(C)]
-pub struct HashResponse {
-    pub digest: BLSDigest,
-}
-
 /// Compute the digest of a message
 ///
 /// # Arguments
@@ -36,7 +33,7 @@ pub struct HashResponse {
 pub unsafe extern "C" fn hash(
     message_ptr: *const u8,
     message_len: libc::size_t,
-) -> *mut HashResponse {
+) -> *mut responses::HashResponse {
     // prep request
     let message = from_raw_parts(message_ptr, message_len);
 
@@ -49,16 +46,11 @@ pub unsafe extern "C" fn hash(
     let compressed_digest_slice = compressed_digest.as_ref();
     raw_digest.copy_from_slice(compressed_digest_slice);
 
-    let response = HashResponse { digest: raw_digest };
+    let response = responses::HashResponse { digest: raw_digest };
 
     mem::forget(&response);
 
     Box::into_raw(Box::new(response))
-}
-
-#[repr(C)]
-pub struct AggregateResponse {
-    pub signature: BLSSignature,
 }
 
 /// Aggregate signatures together into a new signature
@@ -71,7 +63,7 @@ pub struct AggregateResponse {
 pub unsafe extern "C" fn aggregate(
     flattened_signatures_ptr: *const u8,
     flattened_signatures_len: libc::size_t,
-) -> *mut AggregateResponse {
+) -> *mut responses::AggregateResponse {
     // prep request
     let raw_signatures = from_raw_parts(flattened_signatures_ptr, flattened_signatures_len)
         .iter()
@@ -96,18 +88,13 @@ pub unsafe extern "C" fn aggregate(
     let mut raw_signature: [u8; SIGNATURE_BYTES] = [0; SIGNATURE_BYTES];
     raw_signature.copy_from_slice(signature.as_bytes().as_slice());
 
-    let response = AggregateResponse {
+    let response = responses::AggregateResponse {
         signature: raw_signature,
     };
 
     mem::forget(&response);
 
     Box::into_raw(Box::new(response))
-}
-
-#[repr(C)]
-pub struct VerifyResponse {
-    result: u8,
 }
 
 /// Verify that a signature is the aggregated signature of hashes - pubkeys
@@ -126,7 +113,7 @@ pub unsafe extern "C" fn verify(
     flattened_digests_len: libc::size_t,
     flattened_public_keys_ptr: *const u8,
     flattened_public_keys_len: libc::size_t,
-) -> *mut VerifyResponse {
+) -> *mut responses::VerifyResponse {
     // prep request
     let raw_signature = from_raw_parts(signature_ptr, SIGNATURE_BYTES);
     let signature = Signature::from_bytes(raw_signature).unwrap();
@@ -168,21 +155,14 @@ pub unsafe extern "C" fn verify(
     // call method
     let result = signature::verify(&signature, digests.as_slice(), public_keys.as_slice());
 
-    println!("{:?}", result);
-
     // prep response
-    let response = VerifyResponse {
+    let response = responses::VerifyResponse {
         result: result as u8,
     };
 
     mem::forget(&response);
 
     Box::into_raw(Box::new(response))
-}
-
-#[repr(C)]
-pub struct PrivateKeyGenerateResponse {
-    pub private_key: BLSPrivateKey,
 }
 
 /// Generate a new private key
@@ -193,7 +173,7 @@ pub struct PrivateKeyGenerateResponse {
 #[no_mangle]
 pub unsafe extern "C" fn private_key_generate(
     raw_seed_ptr: *const u8,
-) -> *mut PrivateKeyGenerateResponse {
+) -> *mut responses::PrivateKeyGenerateResponse {
     let raw_seed_slice = from_raw_parts(raw_seed_ptr, 16);
     let mut raw_seed: [u8; 16] = [0; 16];
     raw_seed.copy_from_slice(raw_seed_slice);
@@ -210,18 +190,13 @@ pub unsafe extern "C" fn private_key_generate(
     let mut raw_private_key: [u8; PRIVATE_KEY_BYTES] = [0; PRIVATE_KEY_BYTES];
     raw_private_key.copy_from_slice(private_key.as_bytes().as_slice());
 
-    let response = PrivateKeyGenerateResponse {
+    let response = responses::PrivateKeyGenerateResponse {
         private_key: raw_private_key,
     };
 
     mem::forget(&response);
 
     Box::into_raw(Box::new(response))
-}
-
-#[repr(C)]
-pub struct PrivateKeySignResponse {
-    pub signature: BLSSignature,
 }
 
 /// Sign a message with a private key and return the signature
@@ -236,7 +211,7 @@ pub unsafe extern "C" fn private_key_sign(
     raw_private_key_ptr: *const u8,
     message_ptr: *const u8,
     message_len: libc::size_t,
-) -> *mut PrivateKeySignResponse {
+) -> *mut responses::PrivateKeySignResponse {
     // prep request
     let private_key_slice = from_raw_parts(raw_private_key_ptr, PRIVATE_KEY_BYTES);
     let private_key = PrivateKey::from_bytes(private_key_slice).unwrap();
@@ -249,18 +224,13 @@ pub unsafe extern "C" fn private_key_sign(
     let mut raw_signature: [u8; SIGNATURE_BYTES] = [0; SIGNATURE_BYTES];
     raw_signature.copy_from_slice(signature.as_bytes().as_slice());
 
-    let response = PrivateKeySignResponse {
+    let response = responses::PrivateKeySignResponse {
         signature: raw_signature,
     };
 
     mem::forget(&response);
 
     Box::into_raw(Box::new(response))
-}
-
-#[repr(C)]
-pub struct PrivateKeyPublicKeyResponse {
-    pub public_key: BLSPublicKey,
 }
 
 /// Generate the public key for a private key
@@ -271,7 +241,7 @@ pub struct PrivateKeyPublicKeyResponse {
 #[no_mangle]
 pub unsafe extern "C" fn private_key_public_key(
     raw_private_key_ptr: *const u8,
-) -> *mut PrivateKeyPublicKeyResponse {
+) -> *mut responses::PrivateKeyPublicKeyResponse {
     let private_key_slice = from_raw_parts(raw_private_key_ptr, PRIVATE_KEY_BYTES);
     let private_key = PrivateKey::from_bytes(private_key_slice).unwrap();
 
@@ -280,7 +250,7 @@ pub unsafe extern "C" fn private_key_public_key(
     let mut raw_public_key: [u8; PUBLIC_KEY_BYTES] = [0; PUBLIC_KEY_BYTES];
     raw_public_key.copy_from_slice(public_key.as_bytes().as_slice());
 
-    let response = PrivateKeyPublicKeyResponse {
+    let response = responses::PrivateKeyPublicKeyResponse {
         public_key: raw_public_key,
     };
 
