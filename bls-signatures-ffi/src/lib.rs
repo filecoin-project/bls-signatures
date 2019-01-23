@@ -48,8 +48,6 @@ pub unsafe extern "C" fn hash(
 
     let response = responses::HashResponse { digest: raw_digest };
 
-    mem::forget(&response);
-
     Box::into_raw(Box::new(response))
 }
 
@@ -91,8 +89,6 @@ pub unsafe extern "C" fn aggregate(
     let response = responses::AggregateResponse {
         signature: raw_signature,
     };
-
-    mem::forget(&response);
 
     Box::into_raw(Box::new(response))
 }
@@ -161,8 +157,6 @@ pub unsafe extern "C" fn verify(
         result: result as u8,
     };
 
-    mem::forget(&response);
-
     Box::into_raw(Box::new(response))
 }
 
@@ -194,8 +188,6 @@ pub unsafe extern "C" fn private_key_generate(
     let response = responses::PrivateKeyGenerateResponse {
         private_key: raw_private_key,
     };
-
-    mem::forget(&response);
 
     Box::into_raw(Box::new(response))
 }
@@ -229,8 +221,6 @@ pub unsafe extern "C" fn private_key_sign(
         signature: raw_signature,
     };
 
-    mem::forget(&response);
-
     Box::into_raw(Box::new(response))
 }
 
@@ -254,8 +244,6 @@ pub unsafe extern "C" fn private_key_public_key(
     let response = responses::PrivateKeyPublicKeyResponse {
         public_key: raw_public_key,
     };
-
-    mem::forget(&response);
 
     Box::into_raw(Box::new(response))
 }
