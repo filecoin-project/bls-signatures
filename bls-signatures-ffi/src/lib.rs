@@ -1,14 +1,14 @@
 use libc;
 
-use rand::{SeedableRng, XorShiftRng};
-use std::mem;
+use rand::OsRng;
 use std::slice::from_raw_parts;
 
-use bls_signatures::key::{PrivateKey, PublicKey};
-use bls_signatures::signature;
-use bls_signatures::signature::Signature;
+use bls_signatures::{
+    aggregate as aggregate_sig, hash as hash_sig, verify as verify_sig, PrivateKey, PublicKey,
+    Serialize, Signature,
+};
 
-use pairing::bls12_381::{G2Compressed, G2};
+use pairing::bls12_381::G2Compressed;
 use pairing::{CurveAffine, CurveProjective, EncodedPoint};
 
 pub mod responses;
@@ -38,13 +38,11 @@ pub unsafe extern "C" fn hash(
     let message = from_raw_parts(message_ptr, message_len);
 
     // call method
-    let digest = signature::hash(message);
+    let digest = hash_sig(message);
 
     // prep response
     let mut raw_digest: [u8; DIGEST_BYTES] = [0; DIGEST_BYTES];
-    let compressed_digest = digest.into_affine().into_compressed();
-    let compressed_digest_slice = compressed_digest.as_ref();
-    raw_digest.copy_from_slice(compressed_digest_slice);
+    raw_digest.copy_from_slice(digest.into_affine().into_compressed().as_ref());
 
     let response = responses::HashResponse { digest: raw_digest };
 
@@ -63,28 +61,19 @@ pub unsafe extern "C" fn aggregate(
     flattened_signatures_len: libc::size_t,
 ) -> *mut responses::AggregateResponse {
     // prep request
-    let raw_signatures = from_raw_parts(flattened_signatures_ptr, flattened_signatures_len)
+    let signatures: Vec<_> = from_raw_parts(flattened_signatures_ptr, flattened_signatures_len)
         .iter()
         .step_by(SIGNATURE_BYTES)
-        .fold(Default::default(), |mut acc: Vec<BLSSignature>, item| {
+        .map(|item| {
             let sliced = from_raw_parts(item, SIGNATURE_BYTES);
-            let mut x: BLSSignature = [0; SIGNATURE_BYTES];
-            x.copy_from_slice(&sliced[..SIGNATURE_BYTES]);
-            acc.push(x);
-            acc
-        });
-    let mut signatures: Vec<Signature> = Default::default();
+            Signature::from_bytes(sliced).unwrap()
+        })
+        .collect();
 
-    for raw_signature in raw_signatures {
-        signatures.push(Signature::from_bytes(&raw_signature).unwrap());
-    }
-
-    // call method
-    let signature = signature::aggregate(signatures.as_slice());
-
-    // prep response
     let mut raw_signature: [u8; SIGNATURE_BYTES] = [0; SIGNATURE_BYTES];
-    raw_signature.copy_from_slice(signature.as_bytes().as_slice());
+    aggregate_sig(&signatures)
+        .write_bytes(&mut raw_signature.as_mut())
+        .expect("preallocated");
 
     let response = responses::AggregateResponse {
         signature: raw_signature,
@@ -115,42 +104,43 @@ pub unsafe extern "C" fn verify(
     let raw_signature = from_raw_parts(signature_ptr, SIGNATURE_BYTES);
     let signature = Signature::from_bytes(raw_signature).unwrap();
 
-    let raw_digests = from_raw_parts(flattened_digests_ptr, flattened_digests_len)
+    let raw_digests = from_raw_parts(flattened_digests_ptr, flattened_digests_len);
+    let raw_public_keys = from_raw_parts(flattened_public_keys_ptr, flattened_public_keys_len);
+
+    assert_eq!(raw_digests.len() % DIGEST_BYTES, 0);
+    assert_eq!(raw_public_keys.len() % PUBLIC_KEY_BYTES, 0);
+
+    assert_eq!(
+        raw_digests.len() / DIGEST_BYTES,
+        raw_public_keys.len() / PUBLIC_KEY_BYTES
+    );
+
+    let digests: Vec<_> = raw_digests
         .iter()
         .step_by(DIGEST_BYTES)
-        .fold(Default::default(), |mut acc: Vec<BLSDigest>, item| {
+        .map(|item| {
             let sliced = from_raw_parts(item, DIGEST_BYTES);
-            let mut x: BLSDigest = [0; DIGEST_BYTES];
-            x.copy_from_slice(&sliced[..DIGEST_BYTES]);
-            acc.push(x);
-            acc
-        });
-    let mut digests: Vec<G2> = Default::default();
+            let mut digest = G2Compressed::empty();
+            digest.as_mut().copy_from_slice(sliced);
 
-    for raw_digest in raw_digests {
-        let mut digest = G2Compressed::empty();
-        digest.as_mut().copy_from_slice(&raw_digest);
-        digests.push(digest.into_affine().unwrap().into_projective());
-    }
+            digest
+                .into_affine()
+                .expect("invalid digest")
+                .into_projective()
+        })
+        .collect();
 
-    let raw_public_keys = from_raw_parts(flattened_public_keys_ptr, flattened_public_keys_len)
+    let public_keys: Vec<_> = raw_public_keys
         .iter()
         .step_by(PUBLIC_KEY_BYTES)
-        .fold(Default::default(), |mut acc: Vec<BLSPublicKey>, item| {
+        .map(|item| {
             let sliced = from_raw_parts(item, PUBLIC_KEY_BYTES);
-            let mut x: BLSPublicKey = [0; PUBLIC_KEY_BYTES];
-            x.copy_from_slice(&sliced[..PUBLIC_KEY_BYTES]);
-            acc.push(x);
-            acc
-        });
-    let mut public_keys: Vec<PublicKey> = Default::default();
-
-    for raw_public_key in raw_public_keys {
-        public_keys.push(PublicKey::from_bytes(&raw_public_key).unwrap());
-    }
+            PublicKey::from_bytes(sliced).expect("invalid key")
+        })
+        .collect();
 
     // call method
-    let result = signature::verify(&signature, digests.as_slice(), public_keys.as_slice());
+    let result = verify_sig(&signature, digests.as_slice(), public_keys.as_slice());
 
     // prep response
     let response = responses::VerifyResponse {
@@ -166,24 +156,13 @@ pub unsafe extern "C" fn verify(
 ///
 /// * `raw_seed_ptr` - pointer to a seed byte array
 #[no_mangle]
-pub unsafe extern "C" fn private_key_generate(
-    raw_seed_ptr: *const u8,
-) -> *mut responses::PrivateKeyGenerateResponse {
-    let raw_seed_slice = from_raw_parts(raw_seed_ptr, 16);
-    let mut raw_seed: [u8; 16] = [0; 16];
-    raw_seed.copy_from_slice(raw_seed_slice);
-    let seed = mem::transmute::<[u8; 16], [u32; 4]>(raw_seed);
+pub unsafe extern "C" fn private_key_generate() -> *mut responses::PrivateKeyGenerateResponse {
+    let rng = &mut OsRng::new().expect("not enough randomness");
 
-    // @TODO not this
-    // let rng = &mut XorShiftRng::from_seed([0x3dbe6259, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
-    let rng = &mut XorShiftRng::from_seed(seed);
-
-    // call method
-    let private_key = PrivateKey::generate(rng);
-
-    // prep response
     let mut raw_private_key: [u8; PRIVATE_KEY_BYTES] = [0; PRIVATE_KEY_BYTES];
-    raw_private_key.copy_from_slice(private_key.as_bytes().as_slice());
+    PrivateKey::generate(rng)
+        .write_bytes(&mut raw_private_key.as_mut())
+        .expect("preallocated");
 
     let response = responses::PrivateKeyGenerateResponse {
         private_key: raw_private_key,
@@ -207,15 +186,13 @@ pub unsafe extern "C" fn private_key_sign(
 ) -> *mut responses::PrivateKeySignResponse {
     // prep request
     let private_key_slice = from_raw_parts(raw_private_key_ptr, PRIVATE_KEY_BYTES);
-    let private_key = PrivateKey::from_bytes(private_key_slice).unwrap();
+    let private_key = PrivateKey::from_bytes(private_key_slice).expect("invalid private key");
     let message = from_raw_parts(message_ptr, message_len);
 
-    // call method
-    let signature = PrivateKey::sign(&private_key, message);
-
-    // prep response
     let mut raw_signature: [u8; SIGNATURE_BYTES] = [0; SIGNATURE_BYTES];
-    raw_signature.copy_from_slice(signature.as_bytes().as_slice());
+    PrivateKey::sign(&private_key, message)
+        .write_bytes(&mut raw_signature.as_mut())
+        .expect("preallocated");
 
     let response = responses::PrivateKeySignResponse {
         signature: raw_signature,
@@ -234,12 +211,13 @@ pub unsafe extern "C" fn private_key_public_key(
     raw_private_key_ptr: *const u8,
 ) -> *mut responses::PrivateKeyPublicKeyResponse {
     let private_key_slice = from_raw_parts(raw_private_key_ptr, PRIVATE_KEY_BYTES);
-    let private_key = PrivateKey::from_bytes(private_key_slice).unwrap();
-
-    let public_key = private_key.public_key();
+    let private_key = PrivateKey::from_bytes(private_key_slice).expect("invalid private key");
 
     let mut raw_public_key: [u8; PUBLIC_KEY_BYTES] = [0; PUBLIC_KEY_BYTES];
-    raw_public_key.copy_from_slice(public_key.as_bytes().as_slice());
+    private_key
+        .public_key()
+        .write_bytes(&mut raw_public_key.as_mut())
+        .expect("preallocated");
 
     let response = responses::PrivateKeyPublicKeyResponse {
         public_key: raw_public_key,
@@ -255,8 +233,7 @@ mod tests {
     #[test]
     fn key_verification() {
         unsafe {
-            let seed = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1];
-            let private_key = (*private_key_generate(&seed[0])).private_key;
+            let private_key = (*private_key_generate()).private_key;
             let public_key = (*private_key_public_key(&private_key[0])).public_key;
             let message = "hello world".as_bytes();
             let digest = (*hash(&message[0], message.len())).digest;

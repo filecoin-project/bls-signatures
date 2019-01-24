@@ -1,3 +1,5 @@
+use std::io;
+
 use failure::{format_err, Error};
 use pairing::bls12_381::{Bls12, Fq12, G1Affine, G2Affine, G2Compressed, G2};
 use pairing::{CurveAffine, CurveProjective, EncodedPoint, Engine, Field};
@@ -20,12 +22,14 @@ impl From<G2Affine> for Signature {
     }
 }
 
-impl Signature {
-    pub fn as_bytes(&self) -> Vec<u8> {
-        G2Compressed::from_affine(self.0).as_ref().to_vec()
+impl Serialize for Signature {
+    fn write_bytes(&self, dest: &mut impl io::Write) -> io::Result<()> {
+        dest.write_all(G2Compressed::from_affine(self.0).as_ref())?;
+
+        Ok(())
     }
 
-    pub fn from_bytes(raw: &[u8]) -> Result<Self, Error> {
+    fn from_bytes(raw: &[u8]) -> Result<Self, Error> {
         if raw.len() != G2Compressed::size() {
             return Err(format_err!("size missmatch"));
         }
