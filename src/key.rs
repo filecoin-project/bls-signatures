@@ -1,4 +1,4 @@
-use std::io::Cursor;
+use std::io::{self, Cursor};
 
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use failure::{format_err, Error};
@@ -44,6 +44,20 @@ impl<'a> From<&'a PrivateKey> for FrRepr {
     }
 }
 
+pub trait Serialize: ::std::fmt::Debug + Sized {
+    /// Writes the key to the given writer.
+    fn write_bytes(&self, dest: &mut impl io::Write) -> io::Result<()>;
+
+    /// Recreate the key from bytes in the same form as `write_bytes` produced.
+    fn from_bytes(raw: &[u8]) -> Result<Self, Error>;
+
+    fn as_bytes(&self) -> Vec<u8> {
+        let mut res = Vec::with_capacity(8 * 4);
+        self.write_bytes(&mut res).expect("preallocated");
+        res
+    }
+}
+
 impl PrivateKey {
     /// Generate a new private key.
     pub fn generate<R: Rng>(rng: &mut R) -> Self {
@@ -69,18 +83,18 @@ impl PrivateKey {
     pub fn public_key(&self) -> PublicKey {
         Wnaf::new().scalar(self.into()).base(G1::one()).into()
     }
+}
 
-    pub fn as_bytes(&self) -> Vec<u8> {
-        let mut res = Vec::with_capacity(8 * 4);
-
+impl Serialize for PrivateKey {
+    fn write_bytes(&self, dest: &mut impl io::Write) -> io::Result<()> {
         for digit in self.0.into_repr().as_ref().iter() {
-            res.write_u64::<LittleEndian>(*digit).unwrap();
+            dest.write_u64::<LittleEndian>(*digit)?;
         }
 
-        res
+        Ok(())
     }
 
-    pub fn from_bytes(raw: &[u8]) -> Result<Self, Error> {
+    fn from_bytes(raw: &[u8]) -> Result<Self, Error> {
         let mut res = FrRepr::default();
         let mut reader = Cursor::new(raw);
         for digit in res.0.as_mut().iter_mut() {
@@ -92,11 +106,19 @@ impl PrivateKey {
 }
 
 impl PublicKey {
-    pub fn as_bytes(&self) -> Vec<u8> {
-        G1Compressed::from_affine(self.0).as_ref().to_vec()
+    pub fn as_affine(&self) -> G1Affine {
+        self.0
+    }
+}
+
+impl Serialize for PublicKey {
+    fn write_bytes(&self, dest: &mut impl io::Write) -> io::Result<()> {
+        dest.write_all(G1Compressed::from_affine(self.0).as_ref())?;
+
+        Ok(())
     }
 
-    pub fn from_bytes(raw: &[u8]) -> Result<Self, Error> {
+    fn from_bytes(raw: &[u8]) -> Result<Self, Error> {
         if raw.len() != G1Compressed::size() {
             return Err(format_err!("size missmatch"));
         }
@@ -105,10 +127,6 @@ impl PublicKey {
         res.as_mut().copy_from_slice(raw);
 
         Ok(res.into_affine()?.into())
-    }
-
-    pub fn as_affine(&self) -> G1Affine {
-        self.0
     }
 }
 

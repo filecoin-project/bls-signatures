@@ -4,8 +4,6 @@
 
 > Implementation of BLS signatures in pure Rust.
 
-If you use the nightly compiler, you can enable the `nightly` feature, get a performance boost.
-
 ## Development
 
 ### Tests
