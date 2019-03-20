@@ -18,8 +18,8 @@ members = [
 ]
 
 [dependencies.pairing]
-git = "https://github.com/dignifiedquire/pairing"
-branch = "hashing"
+git = "https://github.com/filecoin-project/pairing"
+branch = "hashing-master"
 
 [features]
-default = ["pairing/u128-support"]
+default = []
