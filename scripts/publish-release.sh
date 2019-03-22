@@ -25,7 +25,7 @@ mkdir $RELEASE_PATH/include
 mkdir -p $RELEASE_PATH/lib/pkgconfig
 
 cp target/release/libbls_signatures.h $RELEASE_PATH/include/
-cp target/release/libbls_signatures.a $RELEASE_PATH/lib/
+cp target/release/libbls_signatures_ffi.a $RELEASE_PATH/lib/libbls_signatures.a
 cp target/release/libbls_signatures.pc $RELEASE_PATH/lib/pkgconfig
 
 pushd $RELEASE_PATH
