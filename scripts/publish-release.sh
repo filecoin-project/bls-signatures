@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-RELEASE_BRANCH="master"
+RELEASE_BRANCH="bugs/local-fallback-2441"
 RELEASE_NAME="$CIRCLE_PROJECT_REPONAME-`uname`"
 RELEASE_FILE="/tmp/$RELEASE_NAME.tar.gz"
 RELEASE_TAG="${CIRCLE_SHA1:0:16}"
