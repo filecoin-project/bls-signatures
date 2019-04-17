@@ -2,8 +2,7 @@
 
 RELEASE_BRANCH="master"
 RELEASE_NAME="$CIRCLE_PROJECT_REPONAME-`uname`"
-RELEASE_PATH="$CIRCLE_ARTIFACTS/$RELEASE_NAME"
-RELEASE_FILE="$RELEASE_PATH.tar.gz"
+RELEASE_FILE="/tmp/$RELEASE_NAME.tar.gz"
 RELEASE_TAG="${CIRCLE_SHA1:0:16}"
 
 # make sure we're on the sanctioned branch
@@ -20,19 +19,7 @@ fi
 
 echo "preparing release file"
 
-mkdir $RELEASE_PATH
-mkdir $RELEASE_PATH/include
-mkdir -p $RELEASE_PATH/lib/pkgconfig
-
-cp target/release/libbls_signatures.h $RELEASE_PATH/include/
-cp target/release/libbls_signatures_ffi.a $RELEASE_PATH/lib/libbls_signatures.a
-cp target/release/libbls_signatures.pc $RELEASE_PATH/lib/pkgconfig
-
-pushd $RELEASE_PATH
-
-tar -czf $RELEASE_FILE ./*
-
-popd
+`dirname $0`/package-release.sh "$RELEASE_FILE"
 
 echo "release file created: $RELEASE_FILE"
 
