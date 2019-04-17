@@ -19,9 +19,7 @@ fi
 
 echo "preparing release file"
 
-`dirname $0`/package-release.sh
-
-mv /tmp/release.tar.gz $RELEASE_FILE
+`dirname $0`/package-release.sh "$RELEASE_FILE"
 
 echo "release file created: $RELEASE_FILE"
 
