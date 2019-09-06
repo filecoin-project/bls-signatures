@@ -1,15 +1,13 @@
-use libc;
-
-use rand::OsRng;
 use std::slice::from_raw_parts;
 
 use bls_signatures::{
-    aggregate as aggregate_sig, hash as hash_sig, verify as verify_sig, PrivateKey, PublicKey,
-    Serialize, Signature,
+    aggregate as aggregate_sig, hash as hash_sig,
+    paired::bls12_381::G2Compressed,
+    paired::{CurveAffine, CurveProjective, EncodedPoint},
+    verify as verify_sig, PrivateKey, PublicKey, Serialize, Signature,
 };
-
-use pairing::bls12_381::G2Compressed;
-use pairing::{CurveAffine, CurveProjective, EncodedPoint};
+use libc;
+use rand::OsRng;
 
 pub mod responses;
 

@@ -2,8 +2,8 @@ use std::io;
 
 use failure::{format_err, Error};
 use ff::Field;
-use pairing::bls12_381::{Bls12, Fq12, G1Affine, G2Affine, G2Compressed, G2};
-use pairing::{CurveAffine, CurveProjective, EncodedPoint, Engine};
+use paired::bls12_381::{Bls12, Fq12, G1Affine, G2Affine, G2Compressed, G2};
+use paired::{CurveAffine, CurveProjective, EncodedPoint, Engine};
 use rayon::prelude::*;
 
 use crate::key::*;

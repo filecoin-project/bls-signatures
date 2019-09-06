@@ -1,12 +1,11 @@
 extern crate bls_signatures;
-extern crate pairing;
 extern crate rand;
 extern crate rayon;
 
 use std::time::{Duration, Instant};
 
+use bls_signatures::paired::bls12_381::G2;
 use bls_signatures::*;
-use pairing::bls12_381::G2;
 use rand::{Rng, SeedableRng, XorShiftRng};
 use rayon::prelude::*;
 
