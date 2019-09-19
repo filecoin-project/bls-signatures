@@ -24,18 +24,6 @@ pub unsafe extern "C" fn destroy_aggregate_response(ptr: *mut AggregateResponse)
     let _ = Box::from_raw(ptr);
 }
 
-/// VerifyResponse
-
-#[repr(C)]
-pub struct VerifyResponse {
-    pub result: u8,
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn destroy_verify_response(ptr: *mut VerifyResponse) {
-    let _ = Box::from_raw(ptr);
-}
-
 /// PrivateKeyGenerateResponse
 
 #[repr(C)]

@@ -3,8 +3,8 @@ use std::io::{self, Cursor};
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use failure::{format_err, Error};
 use ff::PrimeField;
-use pairing::bls12_381::{Fr, FrRepr, G1Affine, G1Compressed, G1};
-use pairing::{CurveProjective, EncodedPoint, Wnaf};
+use paired::bls12_381::{Fr, FrRepr, G1Affine, G1Compressed, G1};
+use paired::{CurveProjective, EncodedPoint, Wnaf};
 use rand::Rng;
 
 use super::signature::*;

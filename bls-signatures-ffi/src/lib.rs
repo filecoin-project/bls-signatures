@@ -1,15 +1,14 @@
-use libc;
-
-use rand::OsRng;
 use std::slice::from_raw_parts;
 
 use bls_signatures::{
-    aggregate as aggregate_sig, hash as hash_sig, verify as verify_sig, PrivateKey, PublicKey,
-    Serialize, Signature,
+    aggregate as aggregate_sig, hash as hash_sig,
+    paired::bls12_381::{G2Affine, G2Compressed},
+    paired::GroupDecodingError,
+    paired::{CurveAffine, CurveProjective, EncodedPoint},
+    verify as verify_sig, PrivateKey, PublicKey, Serialize, Signature,
 };
-
-use pairing::bls12_381::G2Compressed;
-use pairing::{CurveAffine, CurveProjective, EncodedPoint};
+use libc;
+use rand::OsRng;
 
 pub mod responses;
 
@@ -22,6 +21,16 @@ type BLSSignature = [u8; SIGNATURE_BYTES];
 type BLSPrivateKey = [u8; PRIVATE_KEY_BYTES];
 type BLSPublicKey = [u8; PUBLIC_KEY_BYTES];
 type BLSDigest = [u8; DIGEST_BYTES];
+
+/// Unwraps or returns the passed in value.
+macro_rules! try_ffi {
+    ($res:expr, $val:expr) => {{
+        match $res {
+            Ok(res) => res,
+            Err(_) => return $val,
+        }
+    }};
+}
 
 /// Compute the digest of a message
 ///
@@ -55,20 +64,25 @@ pub unsafe extern "C" fn hash(
 ///
 /// * `flattened_signatures_ptr` - pointer to a byte array containing signatures
 /// * `flattened_signatures_len` - length of the byte array (multiple of SIGNATURE_BYTES)
+///
+/// Returns `NULL` on error. Result must be freed using `destroy_aggregate_response`.
 #[no_mangle]
 pub unsafe extern "C" fn aggregate(
     flattened_signatures_ptr: *const u8,
     flattened_signatures_len: libc::size_t,
 ) -> *mut responses::AggregateResponse {
     // prep request
-    let signatures: Vec<_> = from_raw_parts(flattened_signatures_ptr, flattened_signatures_len)
-        .iter()
-        .step_by(SIGNATURE_BYTES)
-        .map(|item| {
-            let sliced = from_raw_parts(item, SIGNATURE_BYTES);
-            Signature::from_bytes(sliced).unwrap()
-        })
-        .collect();
+    let signatures = try_ffi!(
+        from_raw_parts(flattened_signatures_ptr, flattened_signatures_len)
+            .iter()
+            .step_by(SIGNATURE_BYTES)
+            .map(|item| {
+                let sliced = from_raw_parts(item, SIGNATURE_BYTES);
+                Signature::from_bytes(sliced)
+            })
+            .collect::<Result<Vec<_>, _>>(),
+        std::ptr::null_mut()
+    );
 
     let mut raw_signature: [u8; SIGNATURE_BYTES] = [0; SIGNATURE_BYTES];
     aggregate_sig(&signatures)
@@ -83,7 +97,6 @@ pub unsafe extern "C" fn aggregate(
 }
 
 /// Verify that a signature is the aggregated signature of hashes - pubkeys
-/// WARNING: This function can panic if there are a different number of digests and keys
 ///
 /// # Arguments
 ///
@@ -91,7 +104,6 @@ pub unsafe extern "C" fn aggregate(
 /// * `flattened_digests_ptr`     - pointer to a byte array containing digests
 /// * `flattened_digests_len`     - length of the byte array (multiple of DIGEST_BYTES)
 /// * `flattened_public_keys_ptr` - pointer to a byte array containing public keys
-/// * `flattened_public_keys_len` - length of the byte array (multiple of PUBLIC_KEY_BYTES)
 #[no_mangle]
 pub unsafe extern "C" fn verify(
     signature_ptr: *const u8,
@@ -99,55 +111,55 @@ pub unsafe extern "C" fn verify(
     flattened_digests_len: libc::size_t,
     flattened_public_keys_ptr: *const u8,
     flattened_public_keys_len: libc::size_t,
-) -> *mut responses::VerifyResponse {
+) -> libc::c_int {
     // prep request
     let raw_signature = from_raw_parts(signature_ptr, SIGNATURE_BYTES);
-    let signature = Signature::from_bytes(raw_signature).unwrap();
+    let signature = try_ffi!(Signature::from_bytes(raw_signature), 0);
 
     let raw_digests = from_raw_parts(flattened_digests_ptr, flattened_digests_len);
     let raw_public_keys = from_raw_parts(flattened_public_keys_ptr, flattened_public_keys_len);
 
-    assert_eq!(raw_digests.len() % DIGEST_BYTES, 0);
-    assert_eq!(raw_public_keys.len() % PUBLIC_KEY_BYTES, 0);
+    if raw_digests.len() % DIGEST_BYTES != 0 {
+        return 0;
+    }
+    if raw_public_keys.len() % PUBLIC_KEY_BYTES != 0 {
+        return 0;
+    }
 
-    assert_eq!(
-        raw_digests.len() / DIGEST_BYTES,
-        raw_public_keys.len() / PUBLIC_KEY_BYTES
+    if raw_digests.len() / DIGEST_BYTES != raw_public_keys.len() / PUBLIC_KEY_BYTES {
+        return 0;
+    }
+
+    let digests: Vec<_> = try_ffi!(
+        raw_digests
+            .iter()
+            .step_by(DIGEST_BYTES)
+            .map(|item| {
+                let sliced = from_raw_parts(item, DIGEST_BYTES);
+                let mut digest = G2Compressed::empty();
+                digest.as_mut().copy_from_slice(sliced);
+
+                let affine: G2Affine = digest.into_affine()?;
+                let projective = affine.into_projective();
+                Ok(projective)
+            })
+            .collect::<Result<Vec<_>, GroupDecodingError>>(),
+        0
     );
 
-    let digests: Vec<_> = raw_digests
-        .iter()
-        .step_by(DIGEST_BYTES)
-        .map(|item| {
-            let sliced = from_raw_parts(item, DIGEST_BYTES);
-            let mut digest = G2Compressed::empty();
-            digest.as_mut().copy_from_slice(sliced);
+    let public_keys: Vec<_> = try_ffi!(
+        raw_public_keys
+            .iter()
+            .step_by(PUBLIC_KEY_BYTES)
+            .map(|item| {
+                let sliced = from_raw_parts(item, PUBLIC_KEY_BYTES);
+                PublicKey::from_bytes(sliced)
+            })
+            .collect::<Result<_, _>>(),
+        0
+    );
 
-            digest
-                .into_affine()
-                .expect("invalid digest")
-                .into_projective()
-        })
-        .collect();
-
-    let public_keys: Vec<_> = raw_public_keys
-        .iter()
-        .step_by(PUBLIC_KEY_BYTES)
-        .map(|item| {
-            let sliced = from_raw_parts(item, PUBLIC_KEY_BYTES);
-            PublicKey::from_bytes(sliced).expect("invalid key")
-        })
-        .collect();
-
-    // call method
-    let result = verify_sig(&signature, digests.as_slice(), public_keys.as_slice());
-
-    // prep response
-    let response = responses::VerifyResponse {
-        result: result as u8,
-    };
-
-    Box::into_raw(Box::new(response))
+    verify_sig(&signature, digests.as_slice(), public_keys.as_slice()) as libc::c_int
 }
 
 /// Generate a new private key
@@ -178,6 +190,8 @@ pub unsafe extern "C" fn private_key_generate() -> *mut responses::PrivateKeyGen
 /// * `raw_private_key_ptr` - pointer to a private key byte array
 /// * `message_ptr` - pointer to a message byte array
 /// * `message_len` - length of the byte array
+///
+/// Returns `NULL` when passed invalid arguments.
 #[no_mangle]
 pub unsafe extern "C" fn private_key_sign(
     raw_private_key_ptr: *const u8,
@@ -186,7 +200,10 @@ pub unsafe extern "C" fn private_key_sign(
 ) -> *mut responses::PrivateKeySignResponse {
     // prep request
     let private_key_slice = from_raw_parts(raw_private_key_ptr, PRIVATE_KEY_BYTES);
-    let private_key = PrivateKey::from_bytes(private_key_slice).expect("invalid private key");
+    let private_key = try_ffi!(
+        PrivateKey::from_bytes(private_key_slice),
+        std::ptr::null_mut()
+    );
     let message = from_raw_parts(message_ptr, message_len);
 
     let mut raw_signature: [u8; SIGNATURE_BYTES] = [0; SIGNATURE_BYTES];
@@ -206,12 +223,17 @@ pub unsafe extern "C" fn private_key_sign(
 /// # Arguments
 ///
 /// * `raw_private_key_ptr` - pointer to a private key byte array
+///
+/// Returns `NULL` when passed invalid arguments.
 #[no_mangle]
 pub unsafe extern "C" fn private_key_public_key(
     raw_private_key_ptr: *const u8,
 ) -> *mut responses::PrivateKeyPublicKeyResponse {
     let private_key_slice = from_raw_parts(raw_private_key_ptr, PRIVATE_KEY_BYTES);
-    let private_key = PrivateKey::from_bytes(private_key_slice).expect("invalid private key");
+    let private_key = try_ffi!(
+        PrivateKey::from_bytes(private_key_slice),
+        std::ptr::null_mut()
+    );
 
     let mut raw_public_key: [u8; PUBLIC_KEY_BYTES] = [0; PUBLIC_KEY_BYTES];
     private_key
@@ -239,27 +261,37 @@ mod tests {
             let digest = (*hash(&message[0], message.len())).digest;
             let signature =
                 (*private_key_sign(&private_key[0], &message[0], message.len())).signature;
-            let verified = (*verify(
+            let verified = verify(
                 &signature[0],
                 &digest[0],
                 digest.len(),
                 &public_key[0],
                 public_key.len(),
-            ))
-            .result;
+            );
 
             assert_eq!(1, verified);
 
             let different_message = "bye world".as_bytes();
             let different_digest = (*hash(&different_message[0], different_message.len())).digest;
-            let not_verified = (*verify(
+            let not_verified = verify(
                 &signature[0],
                 &different_digest[0],
                 different_digest.len(),
                 &public_key[0],
                 public_key.len(),
-            ))
-            .result;
+            );
+
+            assert_eq!(0, not_verified);
+
+            // garbage verification
+            let different_digest = vec![0, 1, 2, 3, 4];
+            let not_verified = verify(
+                &signature[0],
+                &different_digest[0],
+                different_digest.len(),
+                &public_key[0],
+                public_key.len(),
+            );
 
             assert_eq!(0, not_verified);
         }

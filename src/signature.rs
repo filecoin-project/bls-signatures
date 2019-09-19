@@ -2,8 +2,8 @@ use std::io;
 
 use failure::{format_err, Error};
 use ff::Field;
-use pairing::bls12_381::{Bls12, Fq12, G1Affine, G2Affine, G2Compressed, G2};
-use pairing::{CurveAffine, CurveProjective, EncodedPoint, Engine};
+use paired::bls12_381::{Bls12, Fq12, G1Affine, G2Affine, G2Compressed, G2};
+use paired::{CurveAffine, CurveProjective, EncodedPoint, Engine};
 use rayon::prelude::*;
 
 use crate::key::*;
@@ -67,7 +67,9 @@ pub fn aggregate(signatures: &[Signature]) -> Signature {
 /// Verifies that the signature is the actual aggregated signature of hashes - pubkeys.
 /// Calculated by `e(g1, signature) == \prod_{i = 0}^n e(pk_i, hash_i)`.
 pub fn verify(signature: &Signature, hashes: &[G2], public_keys: &[PublicKey]) -> bool {
-    assert_eq!(hashes.len(), public_keys.len());
+    if hashes.len() != public_keys.len() {
+        return false;
+    }
 
     let mut prepared_keys = public_keys
         .par_iter()
@@ -89,7 +91,11 @@ pub fn verify(signature: &Signature, hashes: &[G2], public_keys: &[PublicKey]) -
         .zip(prepared_hashes.iter())
         .collect::<Vec<_>>();
 
-    Fq12::one() == Bls12::final_exponentiation(&Bls12::miller_loop(&prepared)).unwrap()
+    if let Some(res) = Bls12::final_exponentiation(&Bls12::miller_loop(&prepared)) {
+        Fq12::one() == res
+    } else {
+        false
+    }
 }
 
 #[cfg(test)]
