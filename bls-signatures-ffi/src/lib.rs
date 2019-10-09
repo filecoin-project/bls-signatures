@@ -9,6 +9,7 @@ use bls_signatures::{
 };
 use libc;
 use rand::OsRng;
+use rayon::prelude::*;
 
 pub mod responses;
 
@@ -74,12 +75,8 @@ pub unsafe extern "C" fn aggregate(
     // prep request
     let signatures = try_ffi!(
         from_raw_parts(flattened_signatures_ptr, flattened_signatures_len)
-            .iter()
-            .step_by(SIGNATURE_BYTES)
-            .map(|item| {
-                let sliced = from_raw_parts(item, SIGNATURE_BYTES);
-                Signature::from_bytes(sliced)
-            })
+            .par_chunks(SIGNATURE_BYTES)
+            .map(|item| { Signature::from_bytes(item) })
             .collect::<Result<Vec<_>, _>>(),
         std::ptr::null_mut()
     );
@@ -132,12 +129,10 @@ pub unsafe extern "C" fn verify(
 
     let digests: Vec<_> = try_ffi!(
         raw_digests
-            .iter()
-            .step_by(DIGEST_BYTES)
-            .map(|item| {
-                let sliced = from_raw_parts(item, DIGEST_BYTES);
+            .par_chunks(DIGEST_BYTES)
+            .map(|item: &[u8]| {
                 let mut digest = G2Compressed::empty();
-                digest.as_mut().copy_from_slice(sliced);
+                digest.as_mut().copy_from_slice(item);
 
                 let affine: G2Affine = digest.into_affine()?;
                 let projective = affine.into_projective();
@@ -149,12 +144,8 @@ pub unsafe extern "C" fn verify(
 
     let public_keys: Vec<_> = try_ffi!(
         raw_public_keys
-            .iter()
-            .step_by(PUBLIC_KEY_BYTES)
-            .map(|item| {
-                let sliced = from_raw_parts(item, PUBLIC_KEY_BYTES);
-                PublicKey::from_bytes(sliced)
-            })
+            .par_chunks(PUBLIC_KEY_BYTES)
+            .map(|item| { PublicKey::from_bytes(item) })
             .collect::<Result<_, _>>(),
         0
     );
