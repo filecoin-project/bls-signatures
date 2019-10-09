@@ -71,27 +71,19 @@ pub fn verify(signature: &Signature, hashes: &[G2], public_keys: &[PublicKey]) -
         return false;
     }
 
-    let mut prepared_keys = public_keys
+    let mut prepared: Vec<_> = public_keys
         .par_iter()
-        .map(|pk| pk.as_affine().prepare())
-        .collect::<Vec<_>>();
+        .zip(hashes.par_iter())
+        .map(|(pk, h)| (pk.as_affine().prepare(), h.into_affine().prepare()))
+        .collect();
 
     let mut g1_neg = G1Affine::one();
     g1_neg.negate();
-    prepared_keys.push(g1_neg.prepare());
+    prepared.push((g1_neg.prepare(), signature.0.prepare()));
 
-    let mut prepared_hashes = hashes
-        .par_iter()
-        .map(|h| h.into_affine().prepare())
-        .collect::<Vec<_>>();
-    prepared_hashes.push(signature.0.prepare());
+    let prepared_refs = prepared.iter().map(|(a, b)| (a, b)).collect::<Vec<_>>();
 
-    let prepared = prepared_keys
-        .iter()
-        .zip(prepared_hashes.iter())
-        .collect::<Vec<_>>();
-
-    if let Some(res) = Bls12::final_exponentiation(&Bls12::miller_loop(&prepared)) {
+    if let Some(res) = Bls12::final_exponentiation(&Bls12::miller_loop(&prepared_refs)) {
         Fq12::one() == res
     } else {
         false
