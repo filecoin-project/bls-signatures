@@ -8,7 +8,8 @@ use bls_signatures::{
     verify as verify_sig, PrivateKey, PublicKey, Serialize, Signature,
 };
 use libc;
-use rand::OsRng;
+use rand::chacha::ChaChaRng;
+use rand::{OsRng, SeedableRng};
 use rayon::prelude::*;
 
 pub mod responses;
@@ -154,13 +155,41 @@ pub unsafe extern "C" fn verify(
 }
 
 /// Generate a new private key
-///
-/// # Arguments
-///
-/// * `raw_seed_ptr` - pointer to a seed byte array
 #[no_mangle]
 pub unsafe extern "C" fn private_key_generate() -> *mut responses::PrivateKeyGenerateResponse {
     let rng = &mut OsRng::new().expect("not enough randomness");
+
+    let mut raw_private_key: [u8; PRIVATE_KEY_BYTES] = [0; PRIVATE_KEY_BYTES];
+    PrivateKey::generate(rng)
+        .write_bytes(&mut raw_private_key.as_mut())
+        .expect("preallocated");
+
+    let response = responses::PrivateKeyGenerateResponse {
+        private_key: raw_private_key,
+    };
+
+    Box::into_raw(Box::new(response))
+}
+
+/// Generate a new private key with seed
+///
+/// **Warning**: Use this function only for testing or with very secure seeds
+///
+/// # Arguments
+///
+/// * `raw_seed_ptr` - pointer to a seed byte array with 32 bytes
+///
+/// Returns `NULL` when passed a NULL pointer.
+#[no_mangle]
+pub unsafe extern "C" fn private_key_generate_with_seed(
+    raw_seed_ptr: *const u32,
+) -> *mut responses::PrivateKeyGenerateResponse {
+    if raw_seed_ptr.is_null() {
+        return std::ptr::null_mut();
+    }
+
+    let seed = from_raw_parts(raw_seed_ptr, 8);
+    let rng = &mut ChaChaRng::from_seed(&seed);
 
     let mut raw_private_key: [u8; PRIVATE_KEY_BYTES] = [0; PRIVATE_KEY_BYTES];
     PrivateKey::generate(rng)
@@ -285,6 +314,23 @@ mod tests {
             );
 
             assert_eq!(0, not_verified);
+        }
+    }
+
+    #[test]
+    fn private_key_with_seed() {
+        unsafe {
+            let seed = [5u8; 32];
+            let private_key =
+                (*private_key_generate_with_seed(seed.as_ptr() as *const u32)).private_key;
+            assert_eq!(
+                [
+                    0x96, 0x47, 0x36, 0x4c, 0x00, 0xea, 0x23, 0xef, 0x8c, 0xf3, 0xd6, 0xab, 0x28,
+                    0x5d, 0x7d, 0xaa, 0x16, 0xe0, 0x8f, 0x19, 0x11, 0x1a, 0xa7, 0x55, 0x0f, 0x81,
+                    0x07, 0x18, 0x35, 0x6e, 0x88, 0x4d,
+                ],
+                private_key
+            );
         }
     }
 }
