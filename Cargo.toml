@@ -5,6 +5,12 @@ authors = ["dignifiedquire <dignifiedquire@gmail.com>"]
 license = "MIT OR Apache-2.0"
 edition = "2018"
 
+description = "Aggregate BLS Signatures"
+documentation = "https://docs.rs/bls-signatures"
+homepage = "https://github.com/filecoin-project/bls-signatures"
+repository = "https://github.com/filecoin-project/bls-signatures"
+readme = "README.md"
+
 [package.metadata.release]
 pre-release-commit-message = "chore(release): release {{version}}"
 pro-release-commit-message = "chore(release): starting development cycle for {{next_version}}"
