@@ -4,7 +4,6 @@
 
 > Implementation of BLS signatures in pure Rust.
 
-Note that this is a prototyping repo, whose contents will be merged elsewhere in time.
 
 ## Development
 
