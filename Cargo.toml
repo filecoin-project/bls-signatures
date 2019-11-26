@@ -1,9 +1,13 @@
 [package]
 name = "bls-signatures"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["dignifiedquire <dignifiedquire@gmail.com>"]
 license = "MIT OR Apache-2.0"
 edition = "2018"
+
+[package.metadata.release]
+pre-release-commit-message = "chore(release): release {{version}}"
+pro-release-commit-message = "chore(release): starting development cycle for {{next_version}}"
 
 [dependencies]
 ff = "0.4"
@@ -20,7 +24,3 @@ members = [
 
 [features]
 default = []
-
-[package.metadata.release]
-pre-release-commit-message = "chore(release): release {{version}}"
-pro-release-commit-message = "chore(release): starting development cycle for {{next_version}}"
