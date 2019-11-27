@@ -2,10 +2,10 @@ use std::io::{self, Cursor};
 
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use failure::{format_err, Error};
-use ff::PrimeField;
+use ff::{Field, PrimeField};
+use groupy::{CurveProjective, EncodedPoint, Wnaf};
 use paired::bls12_381::{Fr, FrRepr, G1Affine, G1Compressed, G1};
-use paired::{CurveProjective, EncodedPoint, Wnaf};
-use rand::Rng;
+use rand_core::RngCore;
 
 use super::signature::*;
 
@@ -61,10 +61,8 @@ pub trait Serialize: ::std::fmt::Debug + Sized {
 
 impl PrivateKey {
     /// Generate a new private key.
-    pub fn generate<R: Rng>(rng: &mut R) -> Self {
-        // TODO: probably some better way to derive than just a random field element, but maybe
-        // this is enough?
-        let key: Fr = rng.gen();
+    pub fn generate<R: RngCore>(rng: &mut R) -> Self {
+        let key: Fr = Fr::random(rng);
 
         key.into()
     }
@@ -135,11 +133,15 @@ impl Serialize for PublicKey {
 mod tests {
     use super::*;
 
-    use rand::{SeedableRng, XorShiftRng};
+    use rand::SeedableRng;
+    use rand_xorshift::XorShiftRng;
 
     #[test]
     fn test_bytes_roundtrip() {
-        let rng = &mut XorShiftRng::from_seed([0x3dbe6259, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
+        let rng = &mut XorShiftRng::from_seed([
+            0x59, 0x62, 0xbe, 0x5d, 0x76, 0x3d, 0x31, 0x8d, 0x17, 0xdb, 0x37, 0x32, 0x54, 0x06,
+            0xbc, 0xe5,
+        ]);
         let sk = PrivateKey::generate(rng);
         let sk_bytes = sk.as_bytes();
 

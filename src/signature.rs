@@ -2,8 +2,9 @@ use std::io;
 
 use failure::{format_err, Error};
 use ff::Field;
+use groupy::{CurveAffine, CurveProjective, EncodedPoint};
 use paired::bls12_381::{Bls12, Fq12, G1Affine, G2Affine, G2Compressed, G2};
-use paired::{CurveAffine, CurveProjective, EncodedPoint, Engine};
+use paired::{Engine, PairingCurveAffine};
 use rayon::prelude::*;
 
 use crate::key::*;
@@ -94,17 +95,21 @@ pub fn verify(signature: &Signature, hashes: &[G2], public_keys: &[PublicKey]) -
 mod tests {
     use super::*;
 
-    use rand::{Rng, SeedableRng, XorShiftRng};
+    use rand::{Rng, SeedableRng};
+    use rand_xorshift::XorShiftRng;
 
     #[test]
     fn basic_aggregation() {
-        let rng = &mut XorShiftRng::from_seed([0x3dbe6259, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
+        let mut rng = XorShiftRng::from_seed([
+            0x59, 0x62, 0xbe, 0x5d, 0x76, 0x3d, 0x31, 0x8d, 0x17, 0xdb, 0x37, 0x32, 0x54, 0x06,
+            0xbc, 0xe5,
+        ]);
 
         let num_messages = 10;
 
         // generate private keys
         let private_keys: Vec<_> = (0..num_messages)
-            .map(|_| PrivateKey::generate(rng))
+            .map(|_| PrivateKey::generate(&mut rng))
             .collect();
 
         // generate messages
@@ -138,8 +143,11 @@ mod tests {
 
     #[test]
     fn test_bytes_roundtrip() {
-        let rng = &mut XorShiftRng::from_seed([0x3dbe6259, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
-        let sk = PrivateKey::generate(rng);
+        let mut rng = XorShiftRng::from_seed([
+            0x59, 0x62, 0xbe, 0x5d, 0x76, 0x3d, 0x31, 0x8d, 0x17, 0xdb, 0x37, 0x32, 0x54, 0x06,
+            0xbc, 0xe5,
+        ]);
+        let sk = PrivateKey::generate(&mut rng);
 
         let msg = (0..64).map(|_| rng.gen()).collect::<Vec<u8>>();
         let signature = sk.sign(&msg);
