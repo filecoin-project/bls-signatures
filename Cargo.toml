@@ -16,12 +16,13 @@ pre-release-commit-message = "chore(release): release {{version}}"
 pro-release-commit-message = "chore(release): starting development cycle for {{next_version}}"
 
 [dependencies]
-ff = "0.4"
-rand = "0.4"
+ff = "0.5"
 rayon = "1"
 byteorder = "1.2"
 failure = "0.1"
-paired = "^0.15.0"
+paired = "0.16.0"
+groupy = "0.2.0"
+rand_core = "0.5.1"
 
 [workspace]
 members = [
@@ -30,3 +31,7 @@ members = [
 
 [features]
 default = []
+
+[dev-dependencies]
+rand_xorshift = "0.2.0"
+rand = "0.7"

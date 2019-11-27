@@ -6,7 +6,8 @@ use std::time::{Duration, Instant};
 
 use bls_signatures::paired::bls12_381::G2;
 use bls_signatures::*;
-use rand::{Rng, SeedableRng, XorShiftRng};
+use rand::{Rng, SeedableRng};
+use rand_xorshift::XorShiftRng;
 use rayon::prelude::*;
 
 macro_rules! measure {
@@ -46,11 +47,14 @@ macro_rules! measure {
 fn run(num_messages: usize) {
     println!("dancing with {} messages", num_messages);
 
-    let rng = &mut XorShiftRng::from_seed([0x3dbe6259, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
+    let mut rng = XorShiftRng::from_seed([
+        0x59, 0x62, 0xbe, 0x5d, 0x76, 0x3d, 0x31, 0x8d, 0x17, 0xdb, 0x37, 0x32, 0x54, 0x06, 0xbc,
+        0xe5,
+    ]);
 
     // generate private keys
     let private_keys: Vec<_> = (0..num_messages)
-        .map(|_| PrivateKey::generate(rng))
+        .map(|_| PrivateKey::generate(&mut rng))
         .collect();
 
     // generate messages
