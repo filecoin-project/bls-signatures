@@ -3,13 +3,19 @@ use std::io;
 use ff::Field;
 use groupy::{CurveAffine, CurveProjective, EncodedPoint};
 use paired::bls12_381::{Bls12, Fq12, G1Affine, G2Affine, G2Compressed, G2};
-use paired::{Engine, PairingCurveAffine};
+use paired::{Engine, HashToCurve, PairingCurveAffine};
 use rayon::prelude::*;
 
 use crate::error::Error;
 use crate::key::*;
 
-#[derive(Debug, Clone, PartialEq)]
+// BLS_SIG_BLS12381G2-SHA256-SSWU-RO-_NUL_
+const CSUITE: &'static [u8] = &[
+    66, 76, 83, 95, 83, 73, 71, 95, 66, 76, 83, 49, 50, 51, 56, 49, 71, 50, 45, 83, 72, 65, 50, 53,
+    54, 45, 83, 83, 87, 85, 45, 82, 79, 45, 95, 78, 85, 76, 95,
+];
+
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub struct Signature(G2Affine);
 
 impl From<G2> for Signature {
@@ -21,6 +27,12 @@ impl From<G2> for Signature {
 impl From<G2Affine> for Signature {
     fn from(val: G2Affine) -> Self {
         Signature(val)
+    }
+}
+
+impl From<Signature> for G2Affine {
+    fn from(val: Signature) -> Self {
+        val.0
     }
 }
 
@@ -45,7 +57,7 @@ impl Serialize for Signature {
 
 /// Hash the given message, as used in the signature.
 pub fn hash(msg: &[u8]) -> G2 {
-    G2::hash(msg)
+    G2::hash_to_curve(msg, CSUITE)
 }
 
 /// Aggregate signatures by multiplying them together.
@@ -128,7 +140,7 @@ mod tests {
 
         let hashes = messages
             .iter()
-            .map(|message| G2::hash(message))
+            .map(|message| hash(message))
             .collect::<Vec<_>>();
         let public_keys = private_keys
             .iter()
