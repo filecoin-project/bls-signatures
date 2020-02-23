@@ -1,13 +1,12 @@
-use std::io::{self, Cursor};
+use std::io::{self, Cursor, Read};
 
-use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
-use failure::{format_err, Error};
 use ff::{Field, PrimeField};
 use groupy::{CurveProjective, EncodedPoint, Wnaf};
 use paired::bls12_381::{Fr, FrRepr, G1Affine, G1Compressed, G1};
 use rand_core::RngCore;
 
-use super::signature::*;
+use crate::error::Error;
+use crate::signature::*;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct PublicKey(G1Affine);
@@ -87,7 +86,7 @@ impl PrivateKey {
 impl Serialize for PrivateKey {
     fn write_bytes(&self, dest: &mut impl io::Write) -> io::Result<()> {
         for digit in self.0.into_repr().as_ref().iter() {
-            dest.write_u64::<LittleEndian>(*digit)?;
+            dest.write_all(&digit.to_le_bytes())?;
         }
 
         Ok(())
@@ -97,7 +96,9 @@ impl Serialize for PrivateKey {
         let mut res = FrRepr::default();
         let mut reader = Cursor::new(raw);
         for digit in res.0.as_mut().iter_mut() {
-            *digit = reader.read_u64::<LittleEndian>()?;
+            let mut buf = [0; 8];
+            reader.read_exact(&mut buf)?;
+            *digit = u64::from_le_bytes(buf);
         }
 
         Ok(Fr::from_repr(res)?.into())
@@ -119,7 +120,7 @@ impl Serialize for PublicKey {
 
     fn from_bytes(raw: &[u8]) -> Result<Self, Error> {
         if raw.len() != G1Compressed::size() {
-            return Err(format_err!("size missmatch"));
+            return Err(Error::SizeMismatch);
         }
 
         let mut res = G1Compressed::empty();
