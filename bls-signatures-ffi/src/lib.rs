@@ -246,7 +246,7 @@ mod tests {
         unsafe {
             let private_key = (*private_key_generate()).private_key;
             let public_key = (*private_key_public_key(&private_key[0])).public_key;
-            let message = "hello world".as_bytes();
+            let message = b"hello world";
             let digest = (*hash(&message[0], message.len())).digest;
             let signature =
                 (*private_key_sign(&private_key[0], &message[0], message.len())).signature;
@@ -260,7 +260,7 @@ mod tests {
 
             assert_eq!(1, verified);
 
-            let different_message = "bye world".as_bytes();
+            let different_message = b"bye world";
             let different_digest = (*hash(&different_message[0], different_message.len())).digest;
             let not_verified = verify(
                 &signature[0],

@@ -1,15 +1,21 @@
 #![feature(test)]
 extern crate test;
 
+use test::{black_box, Bencher};
+
 use bls_signatures::*;
-use rand::{Rng, SeedableRng, XorShiftRng};
-use test::Bencher;
+use rand::{Rng, SeedableRng};
+use rand_xorshift::XorShiftRng;
+
+const SEED: [u8; 16] = [
+    0x3d, 0xbe, 0x62, 0x59, 0x8d, 0x31, 0x3d, 0x76, 0x32, 0x37, 0xdb, 0x17, 0xe5, 0xbc, 0x06, 0x54,
+];
 
 macro_rules! bench_verify {
     ($name:ident, $num:expr) => {
         #[bench]
         fn $name(b: &mut Bencher) {
-            let rng = &mut XorShiftRng::from_seed([0x3dbe6259, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
+            let rng = &mut XorShiftRng::from_seed(SEED);
             // generate private keys
             let private_keys: Vec<_> = (0..$num).map(|_| PrivateKey::generate(rng)).collect();
 
@@ -36,7 +42,7 @@ macro_rules! bench_verify {
                 .map(|pk| pk.public_key())
                 .collect::<Vec<_>>();
 
-            b.iter(|| test::black_box(verify(&aggregated_signature, &hashes, &public_keys)))
+            b.iter(|| black_box(verify(&aggregated_signature, &hashes, &public_keys)))
         }
     };
 }

@@ -1,12 +1,12 @@
 use std::io;
 
-use failure::{format_err, Error};
 use ff::Field;
 use groupy::{CurveAffine, CurveProjective, EncodedPoint};
 use paired::bls12_381::{Bls12, Fq12, G1Affine, G2Affine, G2Compressed, G2};
 use paired::{Engine, PairingCurveAffine};
 use rayon::prelude::*;
 
+use crate::error::Error;
 use crate::key::*;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -33,7 +33,7 @@ impl Serialize for Signature {
 
     fn from_bytes(raw: &[u8]) -> Result<Self, Error> {
         if raw.len() != G2Compressed::size() {
-            return Err(format_err!("size missmatch"));
+            return Err(Error::SizeMismatch);
         }
 
         let mut res = G2Compressed::empty();
