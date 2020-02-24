@@ -2,4 +2,3 @@
 **/*.rs.bk
 bls-signatures-ffi/target
 *.profile
-Cargo.lock
