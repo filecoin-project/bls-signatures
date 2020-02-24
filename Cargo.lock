@@ -398,8 +398,9 @@ checksum = "2839e79665f131bdb5782e51f2c6c9599c133c6098982a54c794358bf432529c"
 
 [[package]]
 name = "paired"
-version = "0.17.0"
-source = "git+https://github.com/filecoin-project/pairing?branch=feat/hash-to-curve#508a2156399196b0cf1d0a9e578020edeb2f3fa8"
+version = "0.18.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dd8e00a5c3f72cfb17fc051c179470610a3888e463b66ba753ea22fee3972d72"
 dependencies = [
  "blake2b_simd",
  "byteorder",
