@@ -18,10 +18,12 @@ pro-release-commit-message = "chore(release): starting development cycle for {{n
 [dependencies]
 ff = { version = "0.2", package = "fff" }
 groupy = "0.3.0"
-paired = "0.17.0"
+paired = "0.18.0"
 rayon = "1"
 rand_core = "0.5.1"
 thiserror = "1.0"
+sha2ni = "0.8.1"
+hkdf = "0.8.0"
 
 [workspace]
 members = [
@@ -34,3 +36,5 @@ default = []
 [dev-dependencies]
 rand_xorshift = "0.2.0"
 rand = "0.7"
+hex = "0.4.2"
+
