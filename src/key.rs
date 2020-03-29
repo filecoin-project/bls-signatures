@@ -29,12 +29,23 @@ impl From<G1> for PublicKey {
         PublicKey(val)
     }
 }
+impl From<PublicKey> for G1 {
+    fn from(val: PublicKey) -> Self {
+        val.0
+    }
+}
+
 impl From<Fr> for PrivateKey {
     fn from(val: Fr) -> Self {
         PrivateKey(val)
     }
 }
 
+impl From<PrivateKey> for Fr {
+    fn from(val: PrivateKey) -> Self {
+        val.0
+    }
+}
 impl From<PrivateKey> for FrRepr {
     fn from(val: PrivateKey) -> Self {
         val.0.into_repr()

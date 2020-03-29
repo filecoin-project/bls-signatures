@@ -23,6 +23,11 @@ impl From<G2> for Signature {
         Signature(val.into_affine())
     }
 }
+impl From<Signature> for G2 {
+    fn from(val: Signature) -> Self {
+        val.0.into_projective()
+    }
+}
 
 impl From<G2Affine> for Signature {
     fn from(val: G2Affine) -> Self {
