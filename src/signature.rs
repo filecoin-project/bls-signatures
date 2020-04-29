@@ -190,6 +190,12 @@ mod tests {
         g1_compressed: Vec<u8>,
         #[serde(rename = "G2Compressed", with = "Base64Standard")]
         g2_compressed: Vec<u8>,
+        #[serde(rename = "BLSPrivKey")]
+        priv_key: Option<String>,
+        #[serde(rename = "BLSPubKey")]
+        pub_key: Option<String>,
+        #[serde(rename = "BLSSigG2")]
+        signature: Option<String>,
     }
 
     #[derive(Debug, Clone, Deserialize)]
@@ -236,6 +242,25 @@ mod tests {
                     case.ciphersuite.as_bytes()
                 )
             );
+
+            if case.ciphersuite.as_bytes() == CSUITE {
+                let pub_key =
+                    PublicKey::from_bytes(&base64::decode(case.pub_key.as_ref().unwrap()).unwrap())
+                        .unwrap();
+                let priv_key = PrivateKey::from_bytes(
+                    &base64::decode(case.priv_key.as_ref().unwrap()).unwrap(),
+                )
+                .unwrap();
+                let signature = Signature::from_bytes(
+                    &base64::decode(case.signature.as_ref().unwrap()).unwrap(),
+                )
+                .unwrap();
+
+                let sig2 = priv_key.sign(&case.msg);
+                assert_eq!(signature, sig2, "signatures do not match");
+
+                assert!(pub_key.verify(signature, &case.msg), "failed to verify");
+            }
         }
     }
 }
