@@ -5,7 +5,7 @@
       "Ciphersuite": "",
       "G1Compressed": "iMfjiO5Y8duaJNcJiwHRNjQpi+vy0VklSXW9RQyw0of8xiLrce3ei0aahRNVG68f",
       "G2Compressed": "tpMntJx8f85XL+S+CDcW+K1dHJhsRBIOgcnGwDb9RkhF/iTtOM/Ok9D0ZHcZ8bteAXh8hH3vRZLMVGVsAzKPLO9i2oUrbNYcy6FEfpTGqXJSeEh/KPPHGfJOKY6eCTqj",
-      "BLSPrivKey": null,
+      "BLSPrivKey": "",
       "BLSPubKey": null,
       "BLSSigG2": null
     },
@@ -14,27 +14,27 @@
       "Ciphersuite": "BLS_SIG_BLS12381G2_XMD:SHA-256_SSWU_RO_NUL_",
       "G1Compressed": "hMW6jNJQe93jbkaX0CfwuJUHmHHFh+7DY819un+7BfxKvHjAFQ9Glqr4jhBDqXPD",
       "G2Compressed": "qKqzA+M+0U9KkEAEqSvSb/yWnB0efUt/DAQVCnPhhFqRHlGistNp1c7wZWDFrJ9XFcAVZpk9RGmAXfPh8ptTZIGoMr8nUbaQj67Wd20GLVhVIYiSMpmdcrZ51uOLtc//",
-      "BLSPrivKey": "NV1NQvtv23JMb5UIKiEHZzMIdUqE8GCn0uz5vsR1HgY=",
-      "BLSPubKey": "inCG08LjdR834Qlr2Q5TpiQA4aeT14sW8ZJ3LVYW3JYAZn/g7f+K5ofm/bMdg2nd",
-      "BLSSigG2": "g6cQpW+EbBAMBmW4lUyIzHXltZ71vV3hI9Wy0Q1PX2puuP+HA9Vbc+Mt3fxklCeMA+Gstw/2HxJpXiDOoPKjS9POtw/7qijqaUvwqxi0PJVclqh62SsYYqhR10w7TxV1"
+      "BLSPrivKey": "39425429179506665243208675925383439392928907780930041402959207469596265325726",
+      "BLSPubKey": "jHI4U7Wf4fMAgCwS1m2Bto50QlBsLzeV6mK5FaoWA3Wer9dcsuLPwQLQRkJdXndT",
+      "BLSSigG2": "rmNDuEh2n+R9tT+VjPA7OwSJjb9BMJJeSOVr5r5Q++HZv+EFCIpQzrWT067L8NObB//BjkkM5pzhbrH2dHbuOIkO6a4vAM5ukS/xsc3qFAiIGJIg/u8Sn+QVEo5pbf0j"
     },
     {
       "Msg": "1234",
       "Ciphersuite": "BLS_SIG_BLS12381G2_XMD:SHA-256_SSWU_RO_NUL_",
       "G1Compressed": "s+Jc53NZaVm0aU5yW9kKV8nWTKjgirFWIUflU3DCC8pC9ywmtDoSNBQrq+jrgQmQ",
       "G2Compressed": "uTNNu4K+HwOUZ6ogrKqv4a9YJzwxlecRnzBHW9TUPt8gRnWZPmoQUBzKfv6fIFYHACfC/skR+r4PETCg+Ww9sVuU9v5iW3X9MTgY9XIRTvsHx2UQ70Z2r4ha8uziwUEY",
-      "BLSPrivKey": "ZHzz+W7OUdPSmlBd4qdVbQ/55EOLxt2T7arQerBa1Z8=",
-      "BLSPubKey": "gHCrpuZRL03QmyDi2KweVsElB8aax/JQzrUc+n0R7zTjMQa21RQQiPhwd/N+0axV",
-      "BLSSigG2": "iucwWAvfd7rZCeSkJ/XhikFHrl+d4zXYpib+3edIi+/WO1I7Y08phWtIg+hBsaX0ETy/sL/7aBuVH1J3jd0f+d1Eako1c+G/xUJunnuSNkU+d6s6FjfTh2cXGPDkcrFy"
+      "BLSPrivKey": "9749961058607389192058688288745629540952017676935538895534753189824858647209",
+      "BLSPubKey": "kpGbm8GOUA4O7FXPwiAEKc0Ec4madUTCD58g9HOnRVoPbFVdV/SLgpMpAkRUWX0U",
+      "BLSSigG2": "pGQxINMXzwE8SCulqK+gpBosLpRA/xnIEyeIluJFymQ25E3O8WWmWbrr1rXle7mmDaSmJU0p2uix+AJqDTe9feNKgmD8spfz7XOJ57S4/EtEs/kl5GYJ91Kgs8/aS5H0"
     },
     {
       "Msg": "abaaaaabaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "Ciphersuite": "BLS_SIG_BLS12381G2_XMD:SHA-256_SSWU_RO_NUL_",
       "G1Compressed": "iqcM0UYBg4UdcaNPE8MN+W2DZva08kOyy5ohKy6Wk6ZoztmWxiUqoTNopRMGyoNr",
       "G2Compressed": "tc5BY35fEFon58jz1aezg+LTRb0hpXsx3V/4WhOoJAK7EjCzl5YaeflogRunJymCFL369zAxuDiPJFq45G6HuOKdemGqKJ3HoLJ7D2DHUilTGe6X/Lh3z80u5TRKOd5q",
-      "BLSPrivKey": "KPf/xi+M7ClZ4P+dHHm62+9tEtElrF/uCyB/XFJAgHY=",
-      "BLSPubKey": "jGZeBLhR2N+HwoT/R6ged/pcAUh5+aatFmENTPfANHEGAEeC3lxENiT+EUVe5t8C",
-      "BLSSigG2": "t5zZA18mM2bGXVmbPUDzXGJx9DsIZcdiqzHGf15XPLpomVCwkKNkcbZwhua9LbOjDPJEUoLLxUUksMFCEOVaKutUcLCTY7zyvw+lctIUPKxffhncn0Qct3AN7I4QdtR1"
+      "BLSPrivKey": "26494646216157274608186082436279687634958644511086733330189295092182563044763",
+      "BLSPubKey": "kht8kgNIHBHzh8g6FdBU9Sz/z9lniS0FrsE6AqHEXF3A1R6wx+K98AaXAcwL22dh",
+      "BLSSigG2": "oNZxr9fewkmTSSIkPSjVFlLiCOq9aS1Dm/5iEs4daeCDa7q3Cdex50EoNwY7KOnBGTDwgvKq1/g/Sp8TwmVSidZlp5ogSNhoEJ/YjSb4lNITMLS2S+Rho8AfVpRjhE0W"
     }
   ]
 }

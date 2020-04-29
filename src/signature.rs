@@ -247,10 +247,7 @@ mod tests {
                 let pub_key =
                     PublicKey::from_bytes(&base64::decode(case.pub_key.as_ref().unwrap()).unwrap())
                         .unwrap();
-                let priv_key = PrivateKey::from_bytes(
-                    &base64::decode(case.priv_key.as_ref().unwrap()).unwrap(),
-                )
-                .unwrap();
+                let priv_key = PrivateKey::from_string(case.priv_key.as_ref().unwrap()).unwrap();
                 let signature = Signature::from_bytes(
                     &base64::decode(case.signature.as_ref().unwrap()).unwrap(),
                 )

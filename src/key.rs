@@ -107,6 +107,14 @@ impl PrivateKey {
 
         PublicKey(pk)
     }
+
+    /// Deserializes a private key from the field element as a decimal number.
+    pub fn from_string<T: AsRef<str>>(s: T) -> Result<Self, Error> {
+        match Fr::from_str(s.as_ref()) {
+            Some(f) => Ok(f.into()),
+            None => Err(Error::InvalidPrivateKey),
+        }
+    }
 }
 
 impl Serialize for PrivateKey {
@@ -121,8 +129,9 @@ impl Serialize for PrivateKey {
     fn from_bytes(raw: &[u8]) -> Result<Self, Error> {
         let mut res = FrRepr::default();
         let mut reader = Cursor::new(raw);
+        let mut buf = [0; 8];
+
         for digit in res.0.as_mut().iter_mut() {
-            let mut buf = [0; 8];
             reader.read_exact(&mut buf)?;
             *digit = u64::from_le_bytes(buf);
         }
