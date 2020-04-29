@@ -8,3 +8,7 @@ pub use self::signature::{aggregate, hash, verify, Signature};
 
 pub use groupy;
 pub use paired;
+
+#[cfg(test)]
+#[macro_use]
+extern crate base64_serde;

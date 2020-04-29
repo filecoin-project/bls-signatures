@@ -108,8 +108,10 @@ pub fn verify(signature: &Signature, hashes: &[G2], public_keys: &[PublicKey]) -
 mod tests {
     use super::*;
 
+    use base64::STANDARD;
     use rand::{Rng, SeedableRng};
     use rand_xorshift::XorShiftRng;
+    use serde::Deserialize;
 
     #[test]
     fn basic_aggregation() {
@@ -168,5 +170,40 @@ mod tests {
         let signature_bytes = signature.as_bytes();
         assert_eq!(signature_bytes.len(), 96);
         assert_eq!(Signature::from_bytes(&signature_bytes).unwrap(), signature);
+    }
+
+    base64_serde_type!(Base64Standard, STANDARD);
+
+    #[derive(Debug, Clone, Deserialize)]
+    struct Case {
+        #[serde(rename = "Msg")]
+        msg: String,
+        #[serde(rename = "Ciphersuite")]
+        ciphersuite: String,
+        #[serde(rename = "G1Compressed", with = "Base64Standard")]
+        g1_compressed: Vec<u8>,
+        #[serde(rename = "G2Compressed", with = "Base64Standard")]
+        g2_compressed: Vec<u8>,
+    }
+
+    #[derive(Debug, Clone, Deserialize)]
+    struct Cases {
+        cases: Vec<Case>,
+    }
+
+    #[test]
+    fn test_vectors() {
+        let cases: Cases =
+            serde_json::from_slice(&std::fs::read("./tests/data.json").unwrap()).unwrap();
+
+        for case in cases.cases {
+            assert_eq!(case.ciphersuite.as_bytes(), CSUITE);
+            let signature = Signature::from_bytes(&case.g2_compressed).unwrap();
+            let public_key = PublicKey::from_bytes(&case.g1_compressed).unwrap();
+            assert!(
+                public_key.verify(signature, &case.msg),
+                "unable to verify signature"
+            );
+        }
     }
 }
