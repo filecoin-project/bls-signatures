@@ -409,6 +409,7 @@ checksum = "2839e79665f131bdb5782e51f2c6c9599c133c6098982a54c794358bf432529c"
 [[package]]
 name = "paired"
 version = "0.18.0"
+source = "git+https://github.com/filecoin-project/pairing?branch=feat/hash-to-curve-7#65f9f46f0d6e5c4935f4e50f8d822cc0815c9a3a"
 dependencies = [
  "blake2b_simd",
  "byteorder",

@@ -45,15 +45,20 @@ impl Serialize for Signature {
     }
 
     fn from_bytes(raw: &[u8]) -> Result<Self, Error> {
-        if raw.len() != G2Compressed::size() {
-            return Err(Error::SizeMismatch);
-        }
-
-        let mut res = G2Compressed::empty();
-        res.as_mut().copy_from_slice(raw);
-
-        Ok(res.into_affine()?.into())
+        let g2 = g2_from_slice(raw)?;
+        Ok(g2.into())
     }
+}
+
+fn g2_from_slice(raw: &[u8]) -> Result<G2Affine, Error> {
+    if raw.len() != G2Compressed::size() {
+        return Err(Error::SizeMismatch);
+    }
+
+    let mut res = G2Compressed::empty();
+    res.as_mut().copy_from_slice(raw);
+
+    Ok(res.into_affine()?)
 }
 
 /// Hash the given message, as used in the signature.
@@ -109,6 +114,7 @@ mod tests {
     use super::*;
 
     use base64::STANDARD;
+    use paired::bls12_381::{G1Compressed, G1};
     use rand::{Rng, SeedableRng};
     use rand_xorshift::XorShiftRng;
     use serde::Deserialize;
@@ -191,18 +197,44 @@ mod tests {
         cases: Vec<Case>,
     }
 
+    fn g1_from_slice(raw: &[u8]) -> Result<G1Affine, Error> {
+        if raw.len() != G1Compressed::size() {
+            return Err(Error::SizeMismatch);
+        }
+
+        let mut res = G1Compressed::empty();
+        res.as_mut().copy_from_slice(raw);
+
+        Ok(res.into_affine()?)
+    }
+
     #[test]
     fn test_vectors() {
         let cases: Cases =
             serde_json::from_slice(&std::fs::read("./tests/data.json").unwrap()).unwrap();
 
         for case in cases.cases {
-            assert_eq!(case.ciphersuite.as_bytes(), CSUITE);
-            let signature = Signature::from_bytes(&case.g2_compressed).unwrap();
-            let public_key = PublicKey::from_bytes(&case.g1_compressed).unwrap();
-            assert!(
-                public_key.verify(signature, &case.msg),
-                "unable to verify signature"
+            let g1: G1 = g1_from_slice(&case.g1_compressed)
+                .unwrap()
+                .into_projective();
+
+            assert_eq!(
+                g1,
+                <G1 as HashToCurve<ExpandMsgXmd<sha2ni::Sha256>>>::hash_to_curve(
+                    &case.msg,
+                    case.ciphersuite.as_bytes()
+                )
+            );
+
+            let g2: G2 = g2_from_slice(&case.g2_compressed)
+                .unwrap()
+                .into_projective();
+            assert_eq!(
+                g2,
+                <G2 as HashToCurve<ExpandMsgXmd<sha2ni::Sha256>>>::hash_to_curve(
+                    &case.msg,
+                    case.ciphersuite.as_bytes()
+                )
             );
         }
     }
