@@ -10,4 +10,6 @@ pub enum Error {
     GroupDecode(#[from] groupy::GroupDecodingError),
     #[error("Prime field decode error: {0}")]
     FieldDecode(#[from] ff::PrimeFieldDecodingError),
+    #[error("Invalid Private Key")]
+    InvalidPrivateKey,
 }

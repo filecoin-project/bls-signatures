@@ -3,17 +3,13 @@ use std::io;
 use ff::Field;
 use groupy::{CurveAffine, CurveProjective, EncodedPoint};
 use paired::bls12_381::{Bls12, Fq12, G1Affine, G2Affine, G2Compressed, G2};
-use paired::{Engine, HashToCurve, PairingCurveAffine};
+use paired::{Engine, ExpandMsgXmd, HashToCurve, PairingCurveAffine};
 use rayon::prelude::*;
 
 use crate::error::Error;
 use crate::key::*;
 
-// BLS_SIG_BLS12381G2-SHA256-SSWU-RO-_NUL_
-const CSUITE: &'static [u8] = &[
-    66, 76, 83, 95, 83, 73, 71, 95, 66, 76, 83, 49, 50, 51, 56, 49, 71, 50, 45, 83, 72, 65, 50, 53,
-    54, 45, 83, 83, 87, 85, 45, 82, 79, 45, 95, 78, 85, 76, 95,
-];
+const CSUITE: &'static [u8] = b"BLS_SIG_BLS12381G2_XMD:SHA-256_SSWU_RO_NUL_";
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct Signature(G2Affine);
@@ -49,20 +45,25 @@ impl Serialize for Signature {
     }
 
     fn from_bytes(raw: &[u8]) -> Result<Self, Error> {
-        if raw.len() != G2Compressed::size() {
-            return Err(Error::SizeMismatch);
-        }
-
-        let mut res = G2Compressed::empty();
-        res.as_mut().copy_from_slice(raw);
-
-        Ok(res.into_affine()?.into())
+        let g2 = g2_from_slice(raw)?;
+        Ok(g2.into())
     }
+}
+
+fn g2_from_slice(raw: &[u8]) -> Result<G2Affine, Error> {
+    if raw.len() != G2Compressed::size() {
+        return Err(Error::SizeMismatch);
+    }
+
+    let mut res = G2Compressed::empty();
+    res.as_mut().copy_from_slice(raw);
+
+    Ok(res.into_affine()?)
 }
 
 /// Hash the given message, as used in the signature.
 pub fn hash(msg: &[u8]) -> G2 {
-    G2::hash_to_curve(msg, CSUITE)
+    <G2 as HashToCurve<ExpandMsgXmd<sha2ni::Sha256>>>::hash_to_curve(msg, CSUITE)
 }
 
 /// Aggregate signatures by multiplying them together.
@@ -112,8 +113,11 @@ pub fn verify(signature: &Signature, hashes: &[G2], public_keys: &[PublicKey]) -
 mod tests {
     use super::*;
 
+    use base64::STANDARD;
+    use paired::bls12_381::{G1Compressed, G1};
     use rand::{Rng, SeedableRng};
     use rand_xorshift::XorShiftRng;
+    use serde::Deserialize;
 
     #[test]
     fn basic_aggregation() {
@@ -172,5 +176,88 @@ mod tests {
         let signature_bytes = signature.as_bytes();
         assert_eq!(signature_bytes.len(), 96);
         assert_eq!(Signature::from_bytes(&signature_bytes).unwrap(), signature);
+    }
+
+    base64_serde_type!(Base64Standard, STANDARD);
+
+    #[derive(Debug, Clone, Deserialize)]
+    struct Case {
+        #[serde(rename = "Msg")]
+        msg: String,
+        #[serde(rename = "Ciphersuite")]
+        ciphersuite: String,
+        #[serde(rename = "G1Compressed", with = "Base64Standard")]
+        g1_compressed: Vec<u8>,
+        #[serde(rename = "G2Compressed", with = "Base64Standard")]
+        g2_compressed: Vec<u8>,
+        #[serde(rename = "BLSPrivKey")]
+        priv_key: Option<String>,
+        #[serde(rename = "BLSPubKey")]
+        pub_key: Option<String>,
+        #[serde(rename = "BLSSigG2")]
+        signature: Option<String>,
+    }
+
+    #[derive(Debug, Clone, Deserialize)]
+    struct Cases {
+        cases: Vec<Case>,
+    }
+
+    fn g1_from_slice(raw: &[u8]) -> Result<G1Affine, Error> {
+        if raw.len() != G1Compressed::size() {
+            return Err(Error::SizeMismatch);
+        }
+
+        let mut res = G1Compressed::empty();
+        res.as_mut().copy_from_slice(raw);
+
+        Ok(res.into_affine()?)
+    }
+
+    #[test]
+    fn test_vectors() {
+        let cases: Cases =
+            serde_json::from_slice(&std::fs::read("./tests/data.json").unwrap()).unwrap();
+
+        for case in cases.cases {
+            let g1: G1 = g1_from_slice(&case.g1_compressed)
+                .unwrap()
+                .into_projective();
+
+            assert_eq!(
+                g1,
+                <G1 as HashToCurve<ExpandMsgXmd<sha2ni::Sha256>>>::hash_to_curve(
+                    &case.msg,
+                    case.ciphersuite.as_bytes()
+                )
+            );
+
+            let g2: G2 = g2_from_slice(&case.g2_compressed)
+                .unwrap()
+                .into_projective();
+            assert_eq!(
+                g2,
+                <G2 as HashToCurve<ExpandMsgXmd<sha2ni::Sha256>>>::hash_to_curve(
+                    &case.msg,
+                    case.ciphersuite.as_bytes()
+                )
+            );
+
+            if case.ciphersuite.as_bytes() == CSUITE {
+                let pub_key =
+                    PublicKey::from_bytes(&base64::decode(case.pub_key.as_ref().unwrap()).unwrap())
+                        .unwrap();
+                let priv_key = PrivateKey::from_string(case.priv_key.as_ref().unwrap()).unwrap();
+                let signature = Signature::from_bytes(
+                    &base64::decode(case.signature.as_ref().unwrap()).unwrap(),
+                )
+                .unwrap();
+
+                let sig2 = priv_key.sign(&case.msg);
+                assert_eq!(signature, sig2, "signatures do not match");
+
+                assert!(pub_key.verify(signature, &case.msg), "failed to verify");
+            }
+        }
     }
 }
