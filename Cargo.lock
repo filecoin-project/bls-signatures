@@ -74,7 +74,7 @@ dependencies = [
 
 [[package]]
 name = "bls-signatures"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "base64",
  "base64-serde",
