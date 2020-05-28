@@ -90,6 +90,15 @@ pub fn verify(signature: &Signature, hashes: &[G2], public_keys: &[PublicKey]) -
         return false;
     }
 
+    // enforce messages are distinct
+    for (i, h1) in hashes.iter().enumerate() {
+        for (j, h2) in hashes.iter().enumerate() {
+            if i != j && h1 == h2 {
+                return false;
+            }
+        }
+    }
+
     let mut prepared: Vec<_> = public_keys
         .par_iter()
         .zip(hashes.par_iter())
@@ -159,6 +168,43 @@ mod tests {
         assert!(
             verify(&aggregated_signature, &hashes, &public_keys),
             "failed to verify"
+        );
+    }
+
+    #[test]
+    fn aggregation_same_messages() {
+        let mut rng = XorShiftRng::from_seed([
+            0x59, 0x62, 0xbe, 0x5d, 0x76, 0x3d, 0x31, 0x8d, 0x17, 0xdb, 0x37, 0x32, 0x54, 0x06,
+            0xbc, 0xe5,
+        ]);
+
+        let num_messages = 10;
+
+        // generate private keys
+        let private_keys: Vec<_> = (0..num_messages)
+            .map(|_| PrivateKey::generate(&mut rng))
+            .collect();
+
+        // generate messages
+        let message: Vec<u8> = (0..64).map(|_| rng.gen()).collect();
+
+        // sign messages
+        let sigs = private_keys
+            .iter()
+            .map(|pk| pk.sign(&message))
+            .collect::<Vec<Signature>>();
+
+        let aggregated_signature = aggregate(&sigs);
+
+        // check that equal messages can not be aggreagated
+        let hashes: Vec<_> = (0..num_messages).map(|_| hash(&message)).collect();
+        let public_keys = private_keys
+            .iter()
+            .map(|pk| pk.public_key())
+            .collect::<Vec<_>>();
+        assert!(
+            !verify(&aggregated_signature, &hashes, &public_keys),
+            "must not verify aggregate with the same messages"
         );
     }
 
