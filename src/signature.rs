@@ -86,8 +86,25 @@ pub fn aggregate(signatures: &[Signature]) -> Signature {
 /// Verifies that the signature is the actual aggregated signature of hashes - pubkeys.
 /// Calculated by `e(g1, signature) == \prod_{i = 0}^n e(pk_i, hash_i)`.
 pub fn verify(signature: &Signature, hashes: &[G2], public_keys: &[PublicKey]) -> bool {
-    if hashes.len() != public_keys.len() {
+    let n_hashes = hashes.len();
+
+    if n_hashes == 0 {
         return false;
+    }
+
+    if n_hashes != public_keys.len() {
+        return false;
+    }
+
+    // Enforce that messages are distinct as a countermeasure against BLS's rogue-key attack.
+    // See Section 3.1. of the IRTF's BLS signatures spec:
+    // https://tools.ietf.org/html/draft-irtf-cfrg-bls-signature-02#section-3.1
+    for i in 0..(n_hashes - 1) {
+        for j in (i + 1)..n_hashes {
+            if hashes[i] == hashes[j] {
+                return false;
+            }
+        }
     }
 
     let mut prepared: Vec<_> = public_keys
@@ -159,6 +176,43 @@ mod tests {
         assert!(
             verify(&aggregated_signature, &hashes, &public_keys),
             "failed to verify"
+        );
+    }
+
+    #[test]
+    fn aggregation_same_messages() {
+        let mut rng = XorShiftRng::from_seed([
+            0x59, 0x62, 0xbe, 0x5d, 0x76, 0x3d, 0x31, 0x8d, 0x17, 0xdb, 0x37, 0x32, 0x54, 0x06,
+            0xbc, 0xe5,
+        ]);
+
+        let num_messages = 10;
+
+        // generate private keys
+        let private_keys: Vec<_> = (0..num_messages)
+            .map(|_| PrivateKey::generate(&mut rng))
+            .collect();
+
+        // generate messages
+        let message: Vec<u8> = (0..64).map(|_| rng.gen()).collect();
+
+        // sign messages
+        let sigs = private_keys
+            .iter()
+            .map(|pk| pk.sign(&message))
+            .collect::<Vec<Signature>>();
+
+        let aggregated_signature = aggregate(&sigs);
+
+        // check that equal messages can not be aggreagated
+        let hashes: Vec<_> = (0..num_messages).map(|_| hash(&message)).collect();
+        let public_keys = private_keys
+            .iter()
+            .map(|pk| pk.public_key())
+            .collect::<Vec<_>>();
+        assert!(
+            !verify(&aggregated_signature, &hashes, &public_keys),
+            "must not verify aggregate with the same messages"
         );
     }
 
