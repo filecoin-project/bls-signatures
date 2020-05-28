@@ -1,4 +1,6 @@
+use std::collections::HashSet;
 use std::io;
+use std::iter::FromIterator;
 
 use ff::Field;
 use groupy::{CurveAffine, CurveProjective, EncodedPoint};
@@ -86,7 +88,21 @@ pub fn aggregate(signatures: &[Signature]) -> Signature {
 /// Verifies that the signature is the actual aggregated signature of hashes - pubkeys.
 /// Calculated by `e(g1, signature) == \prod_{i = 0}^n e(pk_i, hash_i)`.
 pub fn verify(signature: &Signature, hashes: &[G2], public_keys: &[PublicKey]) -> bool {
-    if hashes.len() != public_keys.len() {
+    let n_hashes = hashes.len();
+
+    if n_hashes == 0 {
+        return false;
+    }
+
+    if n_hashes != public_keys.len() {
+        return false;
+    }
+
+    // Enforce that messages are distinct as a countermeasure against BLS's rogue-key attack.
+    // See Section 3.1. of the IRTF's BLS signatures spec:
+    // https://tools.ietf.org/html/draft-irtf-cfrg-bls-signature-02#section-3.1
+    let n_unique_hashes = HashSet::from_iter(hashes.iter()).len();
+    if n_unique_hashes != n_hashes {
         return false;
     }
 
