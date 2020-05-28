@@ -127,6 +127,11 @@ impl Serialize for PrivateKey {
     }
 
     fn from_bytes(raw: &[u8]) -> Result<Self, Error> {
+        const FR_SIZE: usize = (Fr::NUM_BITS as usize + 8 - 1) / 8;
+        if raw.len() != FR_SIZE {
+            return Err(Error::SizeMismatch);
+        }
+
         let mut res = FrRepr::default();
         let mut reader = Cursor::new(raw);
         let mut buf = [0; 8];
