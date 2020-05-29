@@ -94,14 +94,18 @@ pub fn verify(signature: &Signature, hashes: &[G2], public_keys: &[PublicKey]) -
         return false;
     }
 
-    if hashes.len() != public_keys.len() {
+    let n_hashes = hashes.len();
+
+    if n_hashes != public_keys.len() {
         return false;
     }
 
-    // enforce messages are distinct
-    for (i, h1) in hashes.iter().enumerate() {
-        for (j, h2) in hashes.iter().enumerate() {
-            if i != j && h1 == h2 {
+    // Enforce that messages are distinct as a countermeasure against BLS's rogue-key attack.
+    // See Section 3.1. of the IRTF's BLS signatures spec:
+    // https://tools.ietf.org/html/draft-irtf-cfrg-bls-signature-02#section-3.1
+    for i in 0..(n_hashes - 1) {
+        for j in (i + 1)..n_hashes {
+            if hashes[i] == hashes[j] {
                 return false;
             }
         }
