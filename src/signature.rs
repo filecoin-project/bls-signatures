@@ -125,15 +125,12 @@ mod tests {
     use base64::STANDARD;
     use paired::bls12_381::{G1Compressed, G1};
     use rand::{Rng, SeedableRng};
-    use rand_xorshift::XorShiftRng;
+    use rand_chacha::ChaCha8Rng;
     use serde::Deserialize;
 
     #[test]
     fn basic_aggregation() {
-        let mut rng = XorShiftRng::from_seed([
-            0x59, 0x62, 0xbe, 0x5d, 0x76, 0x3d, 0x31, 0x8d, 0x17, 0xdb, 0x37, 0x32, 0x54, 0x06,
-            0xbc, 0xe5,
-        ]);
+        let mut rng = ChaCha8Rng::seed_from_u64(12);
 
         let num_messages = 10;
 
@@ -173,10 +170,7 @@ mod tests {
 
     #[test]
     fn aggregation_same_messages() {
-        let mut rng = XorShiftRng::from_seed([
-            0x59, 0x62, 0xbe, 0x5d, 0x76, 0x3d, 0x31, 0x8d, 0x17, 0xdb, 0x37, 0x32, 0x54, 0x06,
-            0xbc, 0xe5,
-        ]);
+        let mut rng = ChaCha8Rng::seed_from_u64(12);
 
         let num_messages = 10;
 
@@ -210,10 +204,7 @@ mod tests {
 
     #[test]
     fn test_bytes_roundtrip() {
-        let mut rng = XorShiftRng::from_seed([
-            0x59, 0x62, 0xbe, 0x5d, 0x76, 0x3d, 0x31, 0x8d, 0x17, 0xdb, 0x37, 0x32, 0x54, 0x06,
-            0xbc, 0xe5,
-        ]);
+        let mut rng = ChaCha8Rng::seed_from_u64(12);
         let sk = PrivateKey::generate(&mut rng);
 
         let msg = (0..64).map(|_| rng.gen()).collect::<Vec<u8>>();

@@ -5,7 +5,7 @@ use groupy::{CurveAffine, CurveProjective, EncodedPoint};
 use hkdf::Hkdf;
 use paired::bls12_381::{Bls12, Fq12, Fr, FrRepr, G1Affine, G1Compressed, G2Affine, G1};
 use paired::{BaseFromRO, Engine, PairingCurveAffine};
-use rand_core::RngCore;
+use rand_core::{CryptoRng, RngCore};
 use sha2ni::digest::generic_array::typenum::U48;
 use sha2ni::digest::generic_array::GenericArray;
 use sha2ni::Sha256;
@@ -81,11 +81,12 @@ impl PrivateKey {
     }
 
     /// Generate a new private key.
-    pub fn generate<R: RngCore>(rng: &mut R) -> Self {
+    pub fn generate<R: RngCore + CryptoRng>(rng: &mut R) -> Self {
         // IKM must be at least 32 bytes long:
         // https://tools.ietf.org/html/draft-irtf-cfrg-bls-signature-00#section-2.3
         let mut ikm = [0u8; 32];
-        rng.fill_bytes(&mut ikm);
+        rng.try_fill_bytes(&mut ikm)
+            .expect("unable to produce secure randomness");
 
         Self::new(ikm)
     }
@@ -207,14 +208,11 @@ mod tests {
     use super::*;
 
     use rand::SeedableRng;
-    use rand_xorshift::XorShiftRng;
+    use rand_chacha::ChaCha8Rng;
 
     #[test]
     fn test_bytes_roundtrip() {
-        let rng = &mut XorShiftRng::from_seed([
-            0x59, 0x62, 0xbe, 0x5d, 0x76, 0x3d, 0x31, 0x8d, 0x17, 0xdb, 0x37, 0x32, 0x54, 0x06,
-            0xbc, 0xe5,
-        ]);
+        let rng = &mut ChaCha8Rng::seed_from_u64(12);
         let sk = PrivateKey::generate(rng);
         let sk_bytes = sk.as_bytes();
 

@@ -34,11 +34,11 @@ members = [
 default = []
 
 [dev-dependencies]
-rand_xorshift = "0.2.0"
 rand = "0.7"
 base64 = "0.12.0"
 serde = { version = "1.0.106", features = ["derive"] }
 serde_json = "1.0.52"
 base64-serde = "0.5.1"
+rand_chacha = "0.2.2"
 
 
