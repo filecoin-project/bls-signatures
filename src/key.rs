@@ -14,9 +14,7 @@ use crate::error::Error;
 use crate::signature::*;
 
 // "BLS-SIG-KEYGEN-SALT-"
-const SALT: &[u8] = &[
-    66, 76, 83, 45, 83, 73, 71, 45, 75, 69, 89, 71, 69, 78, 45, 83, 65, 76, 84, 45,
-];
+const SALT: &[u8] = b"BLS-SIG-KEYGEN-SALT-";
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct PublicKey(G1);
@@ -192,14 +190,20 @@ impl Serialize for PublicKey {
     }
 }
 
-/// Hash a secret key sk to the secret exponent x'; then (PK, SK) = (g^{x'}, x').
+/// Generates a secret key as defined in
+/// https://tools.ietf.org/html/draft-irtf-cfrg-bls-signature-02#section-2.3
 fn key_gen<T: AsRef<[u8]>>(data: T) -> Fr {
-    let mut result = GenericArray::<u8, U48>::default();
+    // HKDF-Extract
+    let mut msg = data.as_ref().to_vec();
+    // append zero byte
+    msg.push(0);
+    let prk = Hkdf::<Sha256>::new(Some(SALT), &msg);
 
+    // HKDF-Expand
     // `result` has enough length to hold the output from HKDF expansion
-    assert!(Hkdf::<Sha256>::new(Some(SALT), data.as_ref())
-        .expand(&[], &mut result)
-        .is_ok());
+    let mut result = GenericArray::<u8, U48>::default();
+    assert!(prk.expand(&[0, 48], &mut result).is_ok());
+
     Fr::from_okm(&result)
 }
 
@@ -230,10 +234,10 @@ mod tests {
     fn test_key_gen() {
         let fr_val = key_gen("hello world (it's a secret!)");
         let expect = FrRepr([
-            0x12760642e26dd0b2u64,
-            0x577f0ddcee74cc5fu64,
-            0xd6b63edfcad22ccu64,
-            0x55b3719e3864a1acu64,
+            15612323793468232148,
+            9327260273368070871,
+            8514276249427569793,
+            1012664670716469815,
         ]);
         assert_eq!(fr_val, Fr::from_repr(expect).unwrap());
     }
