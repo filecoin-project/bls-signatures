@@ -68,7 +68,11 @@ pub fn hash(msg: &[u8]) -> G2 {
 
 /// Aggregate signatures by multiplying them together.
 /// Calculated by `signature = \sum_{i = 0}^n signature_i`.
-pub fn aggregate(signatures: &[Signature]) -> Signature {
+pub fn aggregate(signatures: &[Signature]) -> Result<Signature, Error> {
+    if signatures.is_empty() {
+        return Err(Error::ZeroSizedInput);
+    }
+
     let res = signatures
         .into_par_iter()
         .fold(G2::zero, |mut acc, signature| {
@@ -80,12 +84,16 @@ pub fn aggregate(signatures: &[Signature]) -> Signature {
             acc
         });
 
-    Signature(res.into_affine())
+    Ok(Signature(res.into_affine()))
 }
 
 /// Verifies that the signature is the actual aggregated signature of hashes - pubkeys.
 /// Calculated by `e(g1, signature) == \prod_{i = 0}^n e(pk_i, hash_i)`.
 pub fn verify(signature: &Signature, hashes: &[G2], public_keys: &[PublicKey]) -> bool {
+    if hashes.is_empty() || public_keys.is_empty() {
+        return false;
+    }
+
     if hashes.len() != public_keys.len() {
         return false;
     }
@@ -151,7 +159,7 @@ mod tests {
             .map(|(message, pk)| pk.sign(message))
             .collect::<Vec<Signature>>();
 
-        let aggregated_signature = aggregate(&sigs);
+        let aggregated_signature = aggregate(&sigs).expect("failed to aggregate");
 
         let hashes = messages
             .iter()
@@ -188,7 +196,7 @@ mod tests {
             .map(|pk| pk.sign(&message))
             .collect::<Vec<Signature>>();
 
-        let aggregated_signature = aggregate(&sigs);
+        let aggregated_signature = aggregate(&sigs).expect("failed to aggregate");
 
         // check that equal messages can not be aggreagated
         let hashes: Vec<_> = (0..num_messages).map(|_| hash(&message)).collect();

@@ -12,4 +12,6 @@ pub enum Error {
     FieldDecode(#[from] ff::PrimeFieldDecodingError),
     #[error("Invalid Private Key")]
     InvalidPrivateKey,
+    #[error("Zero sized input")]
+    ZeroSizedInput,
 }

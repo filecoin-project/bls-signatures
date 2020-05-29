@@ -71,7 +71,7 @@ fn run(num_messages: usize) {
 
     let aggregated_signature: Signature;
     measure!("aggregate signatures", num_messages, {
-        aggregated_signature = aggregate(&sigs);
+        aggregated_signature = aggregate(&sigs).expect("failed to aggregate");
     });
 
     let serialized_signature: Vec<_>;
