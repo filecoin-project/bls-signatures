@@ -7,7 +7,7 @@ use std::time::{Duration, Instant};
 use bls_signatures::paired::bls12_381::G2;
 use bls_signatures::*;
 use rand::{Rng, SeedableRng};
-use rand_xorshift::XorShiftRng;
+use rand_chacha::ChaCha8Rng;
 use rayon::prelude::*;
 
 macro_rules! measure {
@@ -47,10 +47,7 @@ macro_rules! measure {
 fn run(num_messages: usize) {
     println!("dancing with {} messages", num_messages);
 
-    let mut rng = XorShiftRng::from_seed([
-        0x59, 0x62, 0xbe, 0x5d, 0x76, 0x3d, 0x31, 0x8d, 0x17, 0xdb, 0x37, 0x32, 0x54, 0x06, 0xbc,
-        0xe5,
-    ]);
+    let mut rng = ChaCha8Rng::seed_from_u64(12);
 
     // generate private keys
     let private_keys: Vec<_> = (0..num_messages)
@@ -74,7 +71,7 @@ fn run(num_messages: usize) {
 
     let aggregated_signature: Signature;
     measure!("aggregate signatures", num_messages, {
-        aggregated_signature = aggregate(&sigs);
+        aggregated_signature = aggregate(&sigs).expect("failed to aggregate");
     });
 
     let serialized_signature: Vec<_>;

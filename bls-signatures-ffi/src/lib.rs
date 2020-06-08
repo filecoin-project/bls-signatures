@@ -82,7 +82,7 @@ pub unsafe extern "C" fn aggregate(
     );
 
     let mut raw_signature: [u8; SIGNATURE_BYTES] = [0; SIGNATURE_BYTES];
-    aggregate_sig(&signatures)
+    try_ffi!(aggregate_sig(&signatures), std::ptr::null_mut())
         .write_bytes(&mut raw_signature.as_mut())
         .expect("preallocated");
 

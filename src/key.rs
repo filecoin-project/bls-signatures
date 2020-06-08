@@ -5,7 +5,7 @@ use groupy::{CurveAffine, CurveProjective, EncodedPoint};
 use hkdf::Hkdf;
 use paired::bls12_381::{Bls12, Fq12, Fr, FrRepr, G1Affine, G1Compressed, G2Affine, G1};
 use paired::{BaseFromRO, Engine, PairingCurveAffine};
-use rand_core::RngCore;
+use rand_core::{CryptoRng, RngCore};
 use sha2ni::digest::generic_array::typenum::U48;
 use sha2ni::digest::generic_array::GenericArray;
 use sha2ni::Sha256;
@@ -14,9 +14,7 @@ use crate::error::Error;
 use crate::signature::*;
 
 // "BLS-SIG-KEYGEN-SALT-"
-const SALT: &[u8] = &[
-    66, 76, 83, 45, 83, 73, 71, 45, 75, 69, 89, 71, 69, 78, 45, 83, 65, 76, 84, 45,
-];
+const SALT: &[u8] = b"BLS-SIG-KEYGEN-SALT-";
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct PublicKey(G1);
@@ -81,11 +79,12 @@ impl PrivateKey {
     }
 
     /// Generate a new private key.
-    pub fn generate<R: RngCore>(rng: &mut R) -> Self {
+    pub fn generate<R: RngCore + CryptoRng>(rng: &mut R) -> Self {
         // IKM must be at least 32 bytes long:
         // https://tools.ietf.org/html/draft-irtf-cfrg-bls-signature-00#section-2.3
         let mut ikm = [0u8; 32];
-        rng.fill_bytes(&mut ikm);
+        rng.try_fill_bytes(&mut ikm)
+            .expect("unable to produce secure randomness");
 
         Self::new(ikm)
     }
@@ -127,6 +126,11 @@ impl Serialize for PrivateKey {
     }
 
     fn from_bytes(raw: &[u8]) -> Result<Self, Error> {
+        const FR_SIZE: usize = (Fr::NUM_BITS as usize + 8 - 1) / 8;
+        if raw.len() != FR_SIZE {
+            return Err(Error::SizeMismatch);
+        }
+
         let mut res = FrRepr::default();
         let mut reader = Cursor::new(raw);
         let mut buf = [0; 8];
@@ -186,14 +190,20 @@ impl Serialize for PublicKey {
     }
 }
 
-/// Hash a secret key sk to the secret exponent x'; then (PK, SK) = (g^{x'}, x').
+/// Generates a secret key as defined in
+/// https://tools.ietf.org/html/draft-irtf-cfrg-bls-signature-02#section-2.3
 fn key_gen<T: AsRef<[u8]>>(data: T) -> Fr {
-    let mut result = GenericArray::<u8, U48>::default();
+    // HKDF-Extract
+    let mut msg = data.as_ref().to_vec();
+    // append zero byte
+    msg.push(0);
+    let prk = Hkdf::<Sha256>::new(Some(SALT), &msg);
 
+    // HKDF-Expand
     // `result` has enough length to hold the output from HKDF expansion
-    assert!(Hkdf::<Sha256>::new(Some(SALT), data.as_ref())
-        .expand(&[], &mut result)
-        .is_ok());
+    let mut result = GenericArray::<u8, U48>::default();
+    assert!(prk.expand(&[0, 48], &mut result).is_ok());
+
     Fr::from_okm(&result)
 }
 
@@ -202,14 +212,11 @@ mod tests {
     use super::*;
 
     use rand::SeedableRng;
-    use rand_xorshift::XorShiftRng;
+    use rand_chacha::ChaCha8Rng;
 
     #[test]
     fn test_bytes_roundtrip() {
-        let rng = &mut XorShiftRng::from_seed([
-            0x59, 0x62, 0xbe, 0x5d, 0x76, 0x3d, 0x31, 0x8d, 0x17, 0xdb, 0x37, 0x32, 0x54, 0x06,
-            0xbc, 0xe5,
-        ]);
+        let rng = &mut ChaCha8Rng::seed_from_u64(12);
         let sk = PrivateKey::generate(rng);
         let sk_bytes = sk.as_bytes();
 
@@ -227,10 +234,10 @@ mod tests {
     fn test_key_gen() {
         let fr_val = key_gen("hello world (it's a secret!)");
         let expect = FrRepr([
-            0x12760642e26dd0b2u64,
-            0x577f0ddcee74cc5fu64,
-            0xd6b63edfcad22ccu64,
-            0x55b3719e3864a1acu64,
+            15612323793468232148,
+            9327260273368070871,
+            8514276249427569793,
+            1012664670716469815,
         ]);
         assert_eq!(fr_val, Fr::from_repr(expect).unwrap());
     }
