@@ -16,14 +16,20 @@ pre-release-commit-message = "chore(release): release {{version}}"
 pro-release-commit-message = "chore(release): starting development cycle for {{next_version}}"
 
 [dependencies]
-ff = { version = "0.2", package = "fff" }
-groupy = "0.3.0"
-paired = "0.20.0"
 rayon = "1"
 rand_core = "0.5.1"
 thiserror = "1.0"
-sha2ni = "0.8.1"
-hkdf = "0.8.0"
+
+ff = { version = "0.2", package = "fff" }
+groupy = "0.3.0"
+
+paired = { version = "0.20.0", optional = true }
+sha2ni = { version = "0.8.1", optional = true }
+hkdf = { version = "0.8.0", optional = true }
+
+blst_lib = { version = "0.2.0", optional = true, package = "blst" }
+blstrs = { git = "https://github.com/filecoin-project/blstrs", branch = "feat-hash-to-curve", version = "0.1.1", optional = true }
+crossbeam-channel = { version = "0.5.0", optional = true }
 
 [workspace]
 members = [
@@ -31,7 +37,9 @@ members = [
 ]
 
 [features]
-default = []
+default = ["pairing"]
+pairing = [ "paired", "sha2ni", "hkdf" ]
+blst = [ "blst_lib", "blstrs", "crossbeam-channel" ]
 
 [dev-dependencies]
 rand = "0.7"
