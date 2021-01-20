@@ -59,6 +59,7 @@ impl Serialize for Signature {
     }
 }
 
+#[cfg(feature = "pairing")]
 fn g2_from_slice(raw: &[u8]) -> Result<G2Affine, Error> {
     if raw.len() != G2Compressed::size() {
         return Err(Error::SizeMismatch);
@@ -68,6 +69,19 @@ fn g2_from_slice(raw: &[u8]) -> Result<G2Affine, Error> {
     res.as_mut().copy_from_slice(raw);
 
     Ok(res.into_affine()?)
+}
+
+#[cfg(feature = "blst")]
+fn g2_from_slice(raw: &[u8]) -> Result<G2Affine, Error> {
+    if raw.len() != G2Compressed::size() {
+        return Err(Error::SizeMismatch);
+    }
+
+    let mut res = G2Compressed::empty();
+    res.as_mut().copy_from_slice(raw);
+
+    // blst already verifies the signature validity in the pairing checks
+    Ok(res.into_affine_unchecked()?)
 }
 
 /// Hash the given message, as used in the signature.
