@@ -11,7 +11,7 @@ use paired::bls12_381::{Fr, FrRepr, G1Affine, G1Compressed, G1};
 #[cfg(feature = "pairing")]
 use paired::BaseFromRO;
 #[cfg(feature = "pairing")]
-use sha2ni::{digest::generic_array::typenum::U48, digest::generic_array::GenericArray, Sha256};
+use sha2::{digest::generic_array::typenum::U48, digest::generic_array::GenericArray, Sha256};
 
 #[cfg(feature = "blst")]
 use blstrs::{

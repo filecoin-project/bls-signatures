@@ -73,7 +73,7 @@ fn g2_from_slice(raw: &[u8]) -> Result<G2Affine, Error> {
 /// Hash the given message, as used in the signature.
 #[cfg(feature = "pairing")]
 pub fn hash(msg: &[u8]) -> G2 {
-    <G2 as HashToCurve<ExpandMsgXmd<sha2ni::Sha256>>>::hash_to_curve(msg, CSUITE)
+    <G2 as HashToCurve<ExpandMsgXmd<sha2::Sha256>>>::hash_to_curve(msg, CSUITE)
 }
 
 #[cfg(feature = "blst")]
@@ -476,7 +476,7 @@ mod tests {
 
     #[cfg(feature = "pairing")]
     fn hash_to_g1(msg: &[u8], suite: &[u8]) -> G1 {
-        <G1 as HashToCurve<ExpandMsgXmd<sha2ni::Sha256>>>::hash_to_curve(msg, suite)
+        <G1 as HashToCurve<ExpandMsgXmd<sha2::Sha256>>>::hash_to_curve(msg, suite)
     }
     #[cfg(feature = "blst")]
     fn hash_to_g1(msg: &[u8], suite: &[u8]) -> G1 {
@@ -485,7 +485,7 @@ mod tests {
 
     #[cfg(feature = "pairing")]
     fn hash_to_g2(msg: &[u8], suite: &[u8]) -> G2 {
-        <G2 as HashToCurve<ExpandMsgXmd<sha2ni::Sha256>>>::hash_to_curve(msg, suite)
+        <G2 as HashToCurve<ExpandMsgXmd<sha2::Sha256>>>::hash_to_curve(msg, suite)
     }
     #[cfg(feature = "blst")]
     fn hash_to_g2(msg: &[u8], suite: &[u8]) -> G2 {

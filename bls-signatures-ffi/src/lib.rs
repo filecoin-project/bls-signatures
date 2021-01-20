@@ -2,14 +2,18 @@ use std::slice::from_raw_parts;
 
 use bls_signatures::{
     aggregate as aggregate_sig,
-    groupy::{CurveAffine, CurveProjective, EncodedPoint, GroupDecodingError},
     hash as hash_sig,
-    paired::bls12_381::{G2Affine, G2Compressed},
     verify as verify_sig, PrivateKey, PublicKey, Serialize, Signature,
 };
+use groupy::{CurveAffine, CurveProjective, EncodedPoint, GroupDecodingError};
 use libc;
 use rand::rngs::OsRng;
 use rayon::prelude::*;
+#[cfg(feature = "pairing")]
+paired::bls12_381::{G2Affine, G2Compressed};
+#[cfg(feature = "blst")]
+blstrs::bls12_381::{G2Affine, G2Compressed};
+
 
 pub mod responses;
 
