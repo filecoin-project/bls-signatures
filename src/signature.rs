@@ -173,7 +173,7 @@ pub fn verify_messages(
     messages: &[&[u8]],
     public_keys: &[PublicKey],
 ) -> bool {
-    use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+    use std::sync::atomic::{AtomicBool, Ordering};
 
     if messages.is_empty() || public_keys.is_empty() {
         return false;
@@ -196,56 +196,43 @@ pub fn verify_messages(
         }
     }
 
-    let (tx, rx) = crossbeam_channel::unbounded();
-    let counter = AtomicUsize::new(0);
     let valid = AtomicBool::new(true);
 
     let n_workers = std::cmp::min(rayon::current_num_threads(), n_messages);
 
-    rayon::scope(|s| {
-        for _ in 0..n_workers {
-            let tx = tx.clone();
-            let counter = &counter;
-            let valid = &valid;
+    let mut pairings = messages
+        .par_iter()
+        .zip(public_keys.par_iter())
+        .chunks(n_messages / n_workers)
+        .map(|chunk| {
+            let mut pairing = blstrs::PairingG1G2::new(true, CSUITE);
 
-            s.spawn(move |_| {
-                let mut pairing = blstrs::PairingG1G2::new(true, CSUITE);
+            for (message, public_key) in chunk {
+                let _res = pairing.aggregate(&public_key.0.into_affine(), None, message, &[]);
 
-                while valid.load(Ordering::Relaxed) {
-                    let work = counter.fetch_add(1, Ordering::Relaxed);
-                    if work >= n_messages {
-                        break;
-                    }
-                    let _res = pairing.aggregate(
-                        &public_keys[work].0.into_affine(),
-                        None,
-                        &messages[work],
-                        &[],
-                    );
+                // Matches `blst@0.2.0`, not checking the errors.
+                // TODO: once upgrading to `blst@0.3`, uncomment.
+                // if res.is_err() {
+                //     valid.store(false, Ordering::Relaxed);
+                //     break;
+                // }
+            }
+            if valid.load(Ordering::Relaxed) {
+                pairing.commit();
+            }
 
-                    // Matches `blst@0.2.0`, not checking the errors.
-                    // TODO: once upgrading to `blst@0.3`, uncomment.
-                    // if res.is_err() {
-                    //     valid.store(false, Ordering::Relaxed);
-                    //     break;
-                    // }
-                }
-                if valid.load(Ordering::Relaxed) {
-                    pairing.commit();
-                }
-                tx.send(pairing).expect("channel gone");
-            });
-        }
-    });
+            pairing
+        })
+        .collect::<Vec<_>>();
 
     let mut gtsig = Fq12::zero();
     if valid.load(Ordering::Relaxed) {
         blstrs::PairingG1G2::aggregated(&mut gtsig, &signature.0);
     }
 
-    let mut acc = rx.recv().unwrap();
-    for _ in 1..n_workers {
-        let _res = acc.merge(&rx.recv().unwrap());
+    let mut acc = pairings.pop().unwrap();
+    for pairing in &pairings {
+        let _res = acc.merge(pairing);
         // Matches `blst@0.2.0`, not checking the errors.
         // TODO: once upgrading to `blst@0.3`, uncomment.
         // if res.is_err() {
@@ -253,11 +240,7 @@ pub fn verify_messages(
         // }
     }
 
-    if valid.load(Ordering::Relaxed) && acc.finalverify(Some(&gtsig)) {
-        true
-    } else {
-        false
-    }
+    valid.load(Ordering::Relaxed) && acc.finalverify(Some(&gtsig))
 }
 
 #[cfg(test)]
