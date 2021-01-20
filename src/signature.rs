@@ -18,7 +18,7 @@ use blstrs::{
 use crate::error::Error;
 use crate::key::*;
 
-const CSUITE: &'static [u8] = b"BLS_SIG_BLS12381G2_XMD:SHA-256_SSWU_RO_NUL_";
+const CSUITE: &[u8] = b"BLS_SIG_BLS12381G2_XMD:SHA-256_SSWU_RO_NUL_";
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct Signature(G2Affine);
@@ -134,13 +134,10 @@ pub fn verify(signature: &Signature, hashes: &[G2], public_keys: &[PublicKey]) -
             let h = h.into_affine().prepare();
             Bls12::miller_loop(&[(&pk, &h)])
         })
-        .reduce(
-            || Fq12::one(),
-            |mut acc, cur| {
-                acc.mul_assign(&cur);
-                acc
-            },
-        );
+        .reduce(Fq12::one, |mut acc, cur| {
+            acc.mul_assign(&cur);
+            acc
+        });
 
     let mut g1_neg = G1Affine::one();
     g1_neg.negate();
