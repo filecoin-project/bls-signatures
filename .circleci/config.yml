@@ -20,7 +20,7 @@ jobs:
       - run: cargo fetch
       - run: rustc +stable --version
       - run: rustc +$(cat rust-toolchain) --version
-      - run: rustup component install nightly-2020-11-18
+      - run: rustup install nightly-2020-11-18
       - persist_to_workspace:
           root: "."
           paths:
