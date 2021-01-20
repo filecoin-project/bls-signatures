@@ -1,8 +1,8 @@
 use std::slice::from_raw_parts;
 
 use bls_signatures::{
-    aggregate as aggregate_sig, hash as hash_sig, verify as verify_sig, PrivateKey, PublicKey,
-    Serialize, Signature,
+    aggregate as aggregate_sig, hash as hash_sig, verify as verify_sig,
+    verify_messages as verify_messages_sig, PrivateKey, PublicKey, Serialize, Signature,
 };
 #[cfg(feature = "blst")]
 use blstrs::bls12_381::{G2Affine, G2Compressed};
@@ -154,6 +154,62 @@ pub unsafe extern "C" fn verify(
     verify_sig(&signature, digests.as_slice(), public_keys.as_slice()) as libc::c_int
 }
 
+/// Verify that a signature is the aggregated signature of the given messages - pubkeys
+///
+/// # Arguments
+///
+/// * `signature_ptr`             - pointer to a signature byte array (SIGNATURE_BYTES long)
+/// * `flattened_messages_ptr`    - pointer to a byte array containing all messages
+/// * `flattened_messages_len`    - length of the byte array
+/// * `messages_sizes_ptr`        - pointer to an array containing the lengths of the messages
+/// * `messages_len`              - length of the two messages arrays
+/// * `flattened_public_keys_ptr` - pointer to a byte array containing public keys
+#[no_mangle]
+pub unsafe extern "C" fn verify_messages(
+    signature_ptr: *const u8,
+    flattened_messages_ptr: *const u8,
+    flattened_messages_len: libc::size_t,
+    message_sizes_ptr: *const libc::size_t,
+    message_sizes_len: libc::size_t,
+    flattened_public_keys_ptr: *const u8,
+    flattened_public_keys_len: libc::size_t,
+) -> libc::c_int {
+    // prep request
+    let raw_signature = from_raw_parts(signature_ptr, SIGNATURE_BYTES);
+    let signature = try_ffi!(Signature::from_bytes(raw_signature), 0);
+
+    let flattened = from_raw_parts(flattened_messages_ptr, flattened_messages_len);
+    let raw_public_keys = from_raw_parts(flattened_public_keys_ptr, flattened_public_keys_len);
+    let chunk_sizes = from_raw_parts(message_sizes_ptr, message_sizes_len);
+
+    // split the flattened message array into slices of individual messages to
+    // be hashed
+    let mut messages: Vec<&[u8]> = Vec::with_capacity(message_sizes_len);
+    let mut offset = 0;
+    for chunk_size in chunk_sizes.iter() {
+        messages.push(&flattened[offset..offset + *chunk_size]);
+        offset += *chunk_size
+    }
+
+    if raw_public_keys.len() % PUBLIC_KEY_BYTES != 0 {
+        return 0;
+    }
+
+    if messages.len() != raw_public_keys.len() / PUBLIC_KEY_BYTES {
+        return 0;
+    }
+
+    let public_keys: Vec<_> = try_ffi!(
+        raw_public_keys
+            .par_chunks(PUBLIC_KEY_BYTES)
+            .map(|item| { PublicKey::from_bytes(item) })
+            .collect::<Result<_, _>>(),
+        0
+    );
+
+    verify_messages_sig(&signature, &messages, public_keys.as_slice()) as libc::c_int
+}
+
 /// Generate a new private key
 ///
 /// # Arguments
@@ -260,6 +316,18 @@ mod tests {
             );
 
             assert_eq!(1, verified);
+
+            let message_sizes = [message.len()];
+            let verified2 = verify_messages(
+                signature.as_ptr(),
+                message.as_ptr(),
+                message.len(),
+                message_sizes.as_ptr(),
+                message_sizes.len(),
+                public_key.as_ptr(),
+                public_key.len(),
+            );
+            assert_eq!(1, verified2);
 
             let different_message = b"bye world";
             let different_digest = (*hash(&different_message[0], different_message.len())).digest;
