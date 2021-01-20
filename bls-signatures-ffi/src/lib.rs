@@ -5,7 +5,7 @@ use bls_signatures::{
     verify_messages as verify_messages_sig, PrivateKey, PublicKey, Serialize, Signature,
 };
 #[cfg(feature = "blst")]
-use blstrs::bls12_381::{G2Affine, G2Compressed};
+use blstrs::{G2Affine, G2Compressed};
 use groupy::{CurveAffine, CurveProjective, EncodedPoint, GroupDecodingError};
 #[cfg(feature = "pairing")]
 use paired::bls12_381::{G2Affine, G2Compressed};
