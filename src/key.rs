@@ -192,11 +192,6 @@ impl PublicKey {
     }
 
     pub fn verify<T: AsRef<[u8]>>(&self, sig: Signature, message: T) -> bool {
-        // zero is not a valid public key
-        if self.0.is_zero() {
-            return false;
-        }
-
         verify_messages(&sig, &[message.as_ref()], &[*self])
     }
 }
