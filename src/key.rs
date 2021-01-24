@@ -1,26 +1,31 @@
 use std::io::{self, Cursor, Read};
 
-use ff::{Field, PrimeField};
+use ff::PrimeField;
 use groupy::{CurveAffine, CurveProjective, EncodedPoint};
-use hkdf::Hkdf;
-use paired::bls12_381::{Bls12, Fq12, Fr, FrRepr, G1Affine, G1Compressed, G2Affine, G1};
-use paired::{BaseFromRO, Engine, PairingCurveAffine};
 use rand_core::{CryptoRng, RngCore};
-use sha2ni::digest::generic_array::typenum::U48;
-use sha2ni::digest::generic_array::GenericArray;
-use sha2ni::Sha256;
+
+#[cfg(feature = "pairing")]
+use hkdf::Hkdf;
+#[cfg(feature = "pairing")]
+use paired::bls12_381::{Fr, FrRepr, G1Affine, G1Compressed, G1};
+#[cfg(feature = "pairing")]
+use paired::BaseFromRO;
+#[cfg(feature = "pairing")]
+use sha2::{digest::generic_array::typenum::U48, digest::generic_array::GenericArray, Sha256};
+
+#[cfg(feature = "blst")]
+use blstrs::{
+    G1Affine, G1Compressed, G1Projective as G1, G2Affine, Scalar as Fr, ScalarRepr as FrRepr,
+};
 
 use crate::error::Error;
 use crate::signature::*;
 
-// "BLS-SIG-KEYGEN-SALT-"
-const SALT: &[u8] = b"BLS-SIG-KEYGEN-SALT-";
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub struct PublicKey(pub(crate) G1);
 
 #[derive(Debug, Copy, Clone, PartialEq)]
-pub struct PublicKey(G1);
-
-#[derive(Debug, Copy, Clone, PartialEq)]
-pub struct PrivateKey(Fr);
+pub struct PrivateKey(pub(crate) Fr);
 
 impl From<G1> for PublicKey {
     fn from(val: G1) -> Self {
@@ -44,6 +49,7 @@ impl From<PrivateKey> for Fr {
         val.0
     }
 }
+
 impl From<PrivateKey> for FrRepr {
     fn from(val: PrivateKey) -> Self {
         val.0.into_repr()
@@ -73,7 +79,7 @@ pub trait Serialize: ::std::fmt::Debug + Sized {
 impl PrivateKey {
     /// Generate a deterministic private key from the given bytes.
     ///
-    /// They must be at least 32 bytes long to be secure.
+    /// They must be at least 32 bytes long to be secure, will panic otherwise.
     pub fn new<T: AsRef<[u8]>>(msg: T) -> Self {
         PrivateKey(key_gen(msg))
     }
@@ -91,6 +97,7 @@ impl PrivateKey {
 
     /// Sign the given message.
     /// Calculated by `signature = hash_into_g2(message) * sk`
+    #[cfg(feature = "pairing")]
     pub fn sign<T: AsRef<[u8]>>(&self, message: T) -> Signature {
         let mut p = hash(message.as_ref());
         p.mul_assign(self.0);
@@ -98,13 +105,46 @@ impl PrivateKey {
         p.into()
     }
 
+    /// Sign the given message.
+    /// Calculated by `signature = hash_into_g2(message) * sk`
+    #[cfg(feature = "blst")]
+    pub fn sign<T: AsRef<[u8]>>(&self, message: T) -> Signature {
+        let p = hash(message.as_ref());
+        let mut sig = G2Affine::zero();
+
+        unsafe {
+            blst_lib::blst_sign_pk2_in_g1(
+                std::ptr::null_mut(),
+                sig.as_mut(),
+                p.as_ref(),
+                &self.0.into(),
+            );
+        }
+
+        sig.into()
+    }
+
     /// Get the public key for this private key.
     /// Calculated by `pk = g1 * sk`.
+    #[cfg(feature = "pairing")]
     pub fn public_key(&self) -> PublicKey {
         let mut pk = G1::one();
         pk.mul_assign(self.0);
 
         PublicKey(pk)
+    }
+
+    /// Get the public key for this private key.
+    /// Calculated by `pk = g1 * sk`.
+    #[cfg(feature = "blst")]
+    pub fn public_key(&self) -> PublicKey {
+        let mut pk = G1Affine::zero();
+
+        unsafe {
+            blst_lib::blst_sk_to_pk2_in_g1(std::ptr::null_mut(), pk.as_mut(), &self.0.into());
+        }
+
+        PublicKey(pk.into_projective())
     }
 
     /// Deserializes a private key from the field element as a decimal number.
@@ -140,6 +180,8 @@ impl Serialize for PrivateKey {
             *digit = u64::from_le_bytes(buf);
         }
 
+        // TODO: once zero keys are rejected, insert check for zero.
+
         Ok(Fr::from_repr(res)?.into())
     }
 }
@@ -150,21 +192,7 @@ impl PublicKey {
     }
 
     pub fn verify<T: AsRef<[u8]>>(&self, sig: Signature, message: T) -> bool {
-        let p = hash(message.as_ref()).into_affine().prepare();
-        let g1gen = {
-            let mut tmp = G1::one();
-            tmp.negate();
-            tmp.into_affine().prepare()
-        };
-
-        let sig_affine: G2Affine = sig.into();
-        match Bls12::final_exponentiation(&Bls12::miller_loop(&[
-            (&self.0.into_affine().prepare(), &p),
-            (&g1gen, &sig_affine.prepare()),
-        ])) {
-            None => false,
-            Some(res) => res == Fq12::one(),
-        }
+        verify_messages(&sig, &[message.as_ref()], &[*self])
     }
 }
 
@@ -192,7 +220,14 @@ impl Serialize for PublicKey {
 
 /// Generates a secret key as defined in
 /// https://tools.ietf.org/html/draft-irtf-cfrg-bls-signature-02#section-2.3
+#[cfg(feature = "pairing")]
 fn key_gen<T: AsRef<[u8]>>(data: T) -> Fr {
+    // "BLS-SIG-KEYGEN-SALT-"
+    const SALT: &[u8] = b"BLS-SIG-KEYGEN-SALT-";
+
+    let data = data.as_ref();
+    assert!(data.len() >= 32, "IKM must be at least 32 bytes");
+
     // HKDF-Extract
     let mut msg = data.as_ref().to_vec();
     // append zero byte
@@ -205,6 +240,30 @@ fn key_gen<T: AsRef<[u8]>>(data: T) -> Fr {
     assert!(prk.expand(&[0, 48], &mut result).is_ok());
 
     Fr::from_okm(&result)
+}
+
+/// Generates a secret key as defined in
+/// https://tools.ietf.org/html/draft-irtf-cfrg-bls-signature-02#section-2.3
+#[cfg(feature = "blst")]
+fn key_gen<T: AsRef<[u8]>>(data: T) -> Fr {
+    use std::convert::TryInto;
+
+    let data = data.as_ref();
+    assert!(data.len() >= 32, "IKM must be at least 32 bytes");
+
+    let key_info = &[];
+    let mut out = blst_lib::blst_scalar::default();
+    unsafe {
+        blst_lib::blst_keygen(
+            &mut out,
+            data.as_ptr(),
+            data.len(),
+            key_info.as_ptr(),
+            key_info.len(),
+        )
+    };
+
+    out.try_into().expect("invalid key generated")
 }
 
 #[cfg(test)]
@@ -232,20 +291,31 @@ mod tests {
 
     #[test]
     fn test_key_gen() {
-        let fr_val = key_gen("hello world (it's a secret!)");
+        let key_material = "hello world (it's a secret!) very secret stuff";
+        let fr_val = key_gen(key_material);
+        #[cfg(feature = "blst")]
         let expect = FrRepr([
-            15612323793468232148,
-            9327260273368070871,
-            8514276249427569793,
-            1012664670716469815,
+            0x8a223b0f9e257f7d,
+            0x2d80f7b7f5ea6cc4,
+            0xcc9e063a0ea0009c,
+            0x4a73baed5cb75109,
         ]);
+
+        #[cfg(feature = "pairing")]
+        let expect = FrRepr([
+            0xa9f8187b89e6d49a,
+            0xf870f34063ce4b16,
+            0xc2aa3c1fff1bbaa3,
+            0x60417787ee46e23f,
+        ]);
+
         assert_eq!(fr_val, Fr::from_repr(expect).unwrap());
     }
 
     #[test]
     fn test_sig() {
         let msg = "this is the message";
-        let sk = "this is the key";
+        let sk = "this is the key and it is very secret";
 
         let sk = PrivateKey::new(sk);
         let sig = sk.sign(msg);

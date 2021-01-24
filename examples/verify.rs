@@ -4,7 +4,11 @@ extern crate rayon;
 
 use std::time::{Duration, Instant};
 
-use bls_signatures::paired::bls12_381::G2;
+#[cfg(feature = "blst")]
+use blstrs::G2Projective as G2;
+#[cfg(feature = "pairing")]
+use paired::bls12_381::G2;
+
 use bls_signatures::*;
 use rand::{Rng, SeedableRng};
 use rand_chacha::ChaCha8Rng;
@@ -101,6 +105,11 @@ fn run(num_messages: usize) {
 
     measure!("verification", num_messages, {
         assert!(verify(&agg_sig, &hashes, &public_keys));
+    });
+
+    measure!("verification messages", num_messages, {
+        let messages = messages.iter().map(|r| &r[..]).collect::<Vec<_>>();
+        assert!(verify_messages(&agg_sig, &messages[..], &public_keys));
     });
 }
 
