@@ -7,6 +7,10 @@
 
 ## Development
 
+### BLST Portability
+
+To enable the portable feature when building blst dependencies, use the 'blst-portable' feature: `--features blst-portable`.
+
 ### Tests
 
 ```
