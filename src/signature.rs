@@ -1,4 +1,5 @@
 use std::io;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use ff::Field;
 use groupy::{CurveAffine, CurveProjective, EncodedPoint};
@@ -131,10 +132,15 @@ pub fn verify(signature: &Signature, hashes: &[G2], public_keys: &[PublicKey]) -
         }
     }
 
+    let is_valid = AtomicBool::new(true);
+
     let mut ml = public_keys
         .par_iter()
         .zip(hashes.par_iter())
         .map(|(pk, h)| {
+            if pk.0.is_zero() {
+                is_valid.store(false, Ordering::Relaxed);
+            }
             let pk = pk.as_affine().prepare();
             let h = h.into_affine().prepare();
             Bls12::miller_loop(&[(&pk, &h)])
@@ -143,6 +149,10 @@ pub fn verify(signature: &Signature, hashes: &[G2], public_keys: &[PublicKey]) -
             acc.mul_assign(&cur);
             acc
         });
+
+    if !is_valid.load(Ordering::Relaxed) {
+        return false;
+    }
 
     let mut g1_neg = G1Affine::one();
     g1_neg.negate();
@@ -178,8 +188,6 @@ pub fn verify_messages(
     messages: &[&[u8]],
     public_keys: &[PublicKey],
 ) -> bool {
-    use std::sync::atomic::{AtomicBool, Ordering};
-
     if messages.is_empty() || public_keys.is_empty() {
         return false;
     }
@@ -198,12 +206,8 @@ pub fn verify_messages(
     // Enforce that messages are distinct as a countermeasure against BLS's rogue-key attack.
     // See Section 3.1. of the IRTF's BLS signatures spec:
     // https://tools.ietf.org/html/draft-irtf-cfrg-bls-signature-02#section-3.1
-    for i in 0..(n_messages - 1) {
-        for j in (i + 1)..n_messages {
-            if messages[i] == messages[j] {
-                return false;
-            }
-        }
+    if !blstrs::unique_messages(messages) {
+        return false;
     }
 
     let valid = AtomicBool::new(true);
@@ -218,14 +222,11 @@ pub fn verify_messages(
             let mut pairing = blstrs::PairingG1G2::new(true, CSUITE);
 
             for (message, public_key) in chunk {
-                let _res = pairing.aggregate(&public_key.0.into_affine(), None, message, &[]);
-
-                // Matches `blst@0.2.0`, not checking the errors.
-                // TODO: once upgrading to `blst@0.3`, uncomment.
-                // if res.is_err() {
-                //     valid.store(false, Ordering::Relaxed);
-                //     break;
-                // }
+                let res = pairing.aggregate(&public_key.0.into_affine(), None, message, &[]);
+                if res.is_err() {
+                    valid.store(false, Ordering::Relaxed);
+                    break;
+                }
             }
             if valid.load(Ordering::Relaxed) {
                 pairing.commit();
@@ -242,12 +243,10 @@ pub fn verify_messages(
 
     let mut acc = pairings.pop().unwrap();
     for pairing in &pairings {
-        let _res = acc.merge(pairing);
-        // Matches `blst@0.2.0`, not checking the errors.
-        // TODO: once upgrading to `blst@0.3`, uncomment.
-        // if res.is_err() {
-        //     return false;
-        // }
+        let res = acc.merge(pairing);
+        if res.is_err() {
+            return false;
+        }
     }
 
     valid.load(Ordering::Relaxed) && acc.finalverify(Some(&gtsig))
@@ -401,12 +400,12 @@ mod tests {
             .collect::<Vec<_>>();
 
         assert!(
-            verify(&aggregated_signature, &hashes, &public_keys),
-            "failed to verify"
+            !verify(&aggregated_signature, &hashes, &public_keys),
+            "verified with zero key"
         );
 
         let messages = messages.iter().map(|r| &r[..]).collect::<Vec<_>>();
-        assert!(verify_messages(
+        assert!(!verify_messages(
             &aggregated_signature,
             &messages[..],
             &public_keys
