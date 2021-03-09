@@ -130,6 +130,10 @@ jobs:
           name: Build (release)
           command: cargo +$(cat rust-toolchain) build --release --verbose --frozen --all
       - run:
+          name: update apt
+          command: apt-get update --fix-missing
+      
+      - run:
           name: Install jq
           command: apt-get install jq -yqq
       - run:
