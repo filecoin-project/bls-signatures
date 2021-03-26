@@ -4,13 +4,13 @@ use ff::PrimeField;
 use groupy::{CurveAffine, CurveProjective, EncodedPoint};
 use rand_core::{CryptoRng, RngCore};
 
-#[cfg(feature = "pairing")]
+#[cfg(all(feature = "pairing", not(any(feature = "blst-portable", feature = "blst"))))]
 use hkdf::Hkdf;
-#[cfg(feature = "pairing")]
+#[cfg(all(feature = "pairing", not(any(feature = "blst-portable", feature = "blst"))))]
 use paired::bls12_381::{Fr, FrRepr, G1Affine, G1Compressed, G1};
-#[cfg(feature = "pairing")]
+#[cfg(all(feature = "pairing", not(any(feature = "blst-portable", feature = "blst"))))]
 use paired::BaseFromRO;
-#[cfg(feature = "pairing")]
+#[cfg(all(feature = "pairing", not(any(feature = "blst-portable", feature = "blst"))))]
 use sha2::{digest::generic_array::typenum::U48, digest::generic_array::GenericArray, Sha256};
 
 #[cfg(feature = "blst")]
@@ -97,7 +97,7 @@ impl PrivateKey {
 
     /// Sign the given message.
     /// Calculated by `signature = hash_into_g2(message) * sk`
-    #[cfg(feature = "pairing")]
+    #[cfg(all(feature = "pairing", not(any(feature = "blst-portable", feature = "blst"))))]
     pub fn sign<T: AsRef<[u8]>>(&self, message: T) -> Signature {
         let mut p = hash(message.as_ref());
         p.mul_assign(self.0);
@@ -126,7 +126,7 @@ impl PrivateKey {
 
     /// Get the public key for this private key.
     /// Calculated by `pk = g1 * sk`.
-    #[cfg(feature = "pairing")]
+    #[cfg(all(feature = "pairing", not(any(feature = "blst-portable", feature = "blst"))))]
     pub fn public_key(&self) -> PublicKey {
         let mut pk = G1::one();
         pk.mul_assign(self.0);
@@ -220,7 +220,7 @@ impl Serialize for PublicKey {
 
 /// Generates a secret key as defined in
 /// https://tools.ietf.org/html/draft-irtf-cfrg-bls-signature-02#section-2.3
-#[cfg(feature = "pairing")]
+#[cfg(all(feature = "pairing", not(any(feature = "blst-portable", feature = "blst"))))]
 fn key_gen<T: AsRef<[u8]>>(data: T) -> Fr {
     // "BLS-SIG-KEYGEN-SALT-"
     const SALT: &[u8] = b"BLS-SIG-KEYGEN-SALT-";
@@ -301,7 +301,7 @@ mod tests {
             0x4a73baed5cb75109,
         ]);
 
-        #[cfg(feature = "pairing")]
+        #[cfg(all(feature = "pairing", not(any(feature = "blst-portable", feature = "blst"))))]
         let expect = FrRepr([
             0xa9f8187b89e6d49a,
             0xf870f34063ce4b16,

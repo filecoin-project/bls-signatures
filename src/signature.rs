@@ -5,9 +5,9 @@ use ff::Field;
 use groupy::{CurveAffine, CurveProjective, EncodedPoint};
 use rayon::prelude::*;
 
-#[cfg(feature = "pairing")]
+#[cfg(all(feature = "pairing", not(any(feature = "blst-portable", feature = "blst"))))]
 use paired::bls12_381::{Bls12, Fq12, G1Affine, G2Affine, G2Compressed, G2};
-#[cfg(feature = "pairing")]
+#[cfg(all(feature = "pairing", not(any(feature = "blst-portable", feature = "blst"))))]
 use paired::{Engine, ExpandMsgXmd, HashToCurve, PairingCurveAffine};
 
 #[cfg(feature = "blst")]
@@ -72,7 +72,7 @@ fn g2_from_slice(raw: &[u8]) -> Result<G2Affine, Error> {
 }
 
 /// Hash the given message, as used in the signature.
-#[cfg(feature = "pairing")]
+#[cfg(all(feature = "pairing", not(any(feature = "blst-portable", feature = "blst"))))]
 pub fn hash(msg: &[u8]) -> G2 {
     <G2 as HashToCurve<ExpandMsgXmd<sha2::Sha256>>>::hash_to_curve(msg, CSUITE)
 }
@@ -170,7 +170,7 @@ pub fn verify(signature: &Signature, hashes: &[G2], public_keys: &[PublicKey]) -
 
 /// Verifies that the signature is the actual aggregated signature of messages - pubkeys.
 /// Calculated by `e(g1, signature) == \prod_{i = 0}^n e(pk_i, hash_i)`.
-#[cfg(feature = "pairing")]
+#[cfg(all(feature = "pairing", not(any(feature = "blst-portable", feature = "blst"))))]
 pub fn verify_messages(
     signature: &Signature,
     messages: &[&[u8]],
@@ -263,7 +263,7 @@ mod tests {
 
     #[cfg(feature = "blst")]
     use blstrs::{G1Compressed, G1Projective as G1, Scalar as Fr};
-    #[cfg(feature = "pairing")]
+    #[cfg(all(feature = "pairing", not(any(feature = "blst-portable", feature = "blst"))))]
     use paired::bls12_381::{Fr, G1Compressed, G1};
 
     #[test]
@@ -473,7 +473,7 @@ mod tests {
         Ok(res.into_affine()?)
     }
 
-    #[cfg(feature = "pairing")]
+    #[cfg(all(feature = "pairing", not(any(feature = "blst-portable", feature = "blst"))))]
     fn hash_to_g1(msg: &[u8], suite: &[u8]) -> G1 {
         <G1 as HashToCurve<ExpandMsgXmd<sha2::Sha256>>>::hash_to_curve(msg, suite)
     }
@@ -482,7 +482,7 @@ mod tests {
         G1::hash_to_curve(msg, suite, &[])
     }
 
-    #[cfg(feature = "pairing")]
+    #[cfg(all(feature = "pairing", not(any(feature = "blst-portable", feature = "blst"))))]
     fn hash_to_g2(msg: &[u8], suite: &[u8]) -> G2 {
         <G2 as HashToCurve<ExpandMsgXmd<sha2::Sha256>>>::hash_to_curve(msg, suite)
     }

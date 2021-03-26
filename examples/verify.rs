@@ -6,7 +6,7 @@ use std::time::{Duration, Instant};
 
 #[cfg(feature = "blst")]
 use blstrs::G2Projective as G2;
-#[cfg(feature = "pairing")]
+#[cfg(all(feature = "pairing", not(any(feature = "blst-portable", feature = "blst"))))]
 use paired::bls12_381::G2;
 
 use bls_signatures::*;

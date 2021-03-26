@@ -1,6 +1,3 @@
-#[cfg(all(feature = "pairing", feature = "blst"))]
-compile_error!("only pairing or blst can be enabled");
-
 mod error;
 mod key;
 mod signature;
