@@ -10,6 +10,7 @@ use groupy::{CurveAffine, CurveProjective, EncodedPoint, GroupDecodingError};
 #[cfg(feature = "pairing")]
 use paired::bls12_381::{G2Affine, G2Compressed};
 use rand::rngs::OsRng;
+#[cfg(feature = "multicore")]
 use rayon::prelude::*;
 
 pub mod responses;
@@ -74,10 +75,17 @@ pub unsafe extern "C" fn aggregate(
     flattened_signatures_len: libc::size_t,
 ) -> *mut responses::AggregateResponse {
     // prep request
+
+    #[cfg(feature = "multicore")]
+    let parts = from_raw_parts(flattened_signatures_ptr, flattened_signatures_len)
+        .par_chunks(SIGNATURE_BYTES);
+    #[cfg(not(feature = "multicore"))]
+    let parts =
+        from_raw_parts(flattened_signatures_ptr, flattened_signatures_len).chunks(SIGNATURE_BYTES);
+
     let signatures = try_ffi!(
-        from_raw_parts(flattened_signatures_ptr, flattened_signatures_len)
-            .par_chunks(SIGNATURE_BYTES)
-            .map(|item| { Signature::from_bytes(item) })
+        parts
+            .map(|item| Signature::from_bytes(item))
             .collect::<Result<Vec<_>, _>>(),
         std::ptr::null_mut()
     );
@@ -128,25 +136,31 @@ pub unsafe extern "C" fn verify(
         return 0;
     }
 
-    let digests: Vec<_> = try_ffi!(
-        raw_digests
-            .par_chunks(DIGEST_BYTES)
-            .map(|item: &[u8]| {
-                let mut digest = G2Compressed::empty();
-                digest.as_mut().copy_from_slice(item);
+    #[cfg(feature = "multicore")]
+    let raw = raw_digests.par_chunks(DIGEST_BYTES);
+    #[cfg(not(feature = "multicore"))]
+    let raw = raw_digests.chunks(DIGEST_BYTES);
 
-                let affine: G2Affine = digest.into_affine()?;
-                let projective = affine.into_projective();
-                Ok(projective)
-            })
-            .collect::<Result<Vec<_>, GroupDecodingError>>(),
+    let digests: Vec<_> = try_ffi!(
+        raw.map(|item: &[u8]| {
+            let mut digest = G2Compressed::empty();
+            digest.as_mut().copy_from_slice(item);
+
+            let affine: G2Affine = digest.into_affine()?;
+            let projective = affine.into_projective();
+            Ok(projective)
+        })
+        .collect::<Result<Vec<_>, GroupDecodingError>>(),
         0
     );
 
+    #[cfg(feature = "multicore")]
+    let raw = raw_public_keys.par_chunks(PUBLIC_KEY_BYTES);
+    #[cfg(not(feature = "multicore"))]
+    let raw = raw_public_keys.chunks(PUBLIC_KEY_BYTES);
+
     let public_keys: Vec<_> = try_ffi!(
-        raw_public_keys
-            .par_chunks(PUBLIC_KEY_BYTES)
-            .map(|item| { PublicKey::from_bytes(item) })
+        raw.map(|item| { PublicKey::from_bytes(item) })
             .collect::<Result<_, _>>(),
         0
     );
@@ -199,10 +213,13 @@ pub unsafe extern "C" fn verify_messages(
         return 0;
     }
 
+    #[cfg(feature = "multicore")]
+    let raw = raw_public_keys.par_chunks(PUBLIC_KEY_BYTES);
+    #[cfg(not(feature = "multicore"))]
+    let raw = raw_public_keys.chunks(PUBLIC_KEY_BYTES);
+
     let public_keys: Vec<_> = try_ffi!(
-        raw_public_keys
-            .par_chunks(PUBLIC_KEY_BYTES)
-            .map(|item| { PublicKey::from_bytes(item) })
+        raw.map(|item| { PublicKey::from_bytes(item) })
             .collect::<Result<_, _>>(),
         0
     );
