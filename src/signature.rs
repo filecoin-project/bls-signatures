@@ -3,6 +3,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 
 use ff::Field;
 use groupy::{CurveAffine, CurveProjective, EncodedPoint};
+#[cfg(feature = "multicore")]
 use rayon::prelude::*;
 
 #[cfg(feature = "pairing")]
@@ -84,6 +85,7 @@ pub fn hash(msg: &[u8]) -> G2 {
 
 /// Aggregate signatures by multiplying them together.
 /// Calculated by `signature = \sum_{i = 0}^n signature_i`.
+#[cfg(feature = "multicore")]
 pub fn aggregate(signatures: &[Signature]) -> Result<Signature, Error> {
     if signatures.is_empty() {
         return Err(Error::ZeroSizedInput);
@@ -97,6 +99,24 @@ pub fn aggregate(signatures: &[Signature]) -> Result<Signature, Error> {
         })
         .reduce(G2::zero, |mut acc, val| {
             acc.add_assign(&val);
+            acc
+        });
+
+    Ok(Signature(res.into_affine()))
+}
+
+/// Aggregate signatures by multiplying them together.
+/// Calculated by `signature = \sum_{i = 0}^n signature_i`.
+#[cfg(not(feature = "multicore"))]
+pub fn aggregate(signatures: &[Signature]) -> Result<Signature, Error> {
+    if signatures.is_empty() {
+        return Err(Error::ZeroSizedInput);
+    }
+
+    let res = signatures
+        .into_iter()
+        .fold(G2::zero(), |mut acc, signature| {
+            acc.add_assign_mixed(&signature.0);
             acc
         });
 
@@ -134,6 +154,7 @@ pub fn verify(signature: &Signature, hashes: &[G2], public_keys: &[PublicKey]) -
 
     let is_valid = AtomicBool::new(true);
 
+    #[cfg(feature = "multicore")]
     let mut ml = public_keys
         .par_iter()
         .zip(hashes.par_iter())
@@ -146,6 +167,23 @@ pub fn verify(signature: &Signature, hashes: &[G2], public_keys: &[PublicKey]) -
             Bls12::miller_loop(&[(&pk, &h)])
         })
         .reduce(Fq12::one, |mut acc, cur| {
+            acc.mul_assign(&cur);
+            acc
+        });
+
+    #[cfg(not(feature = "multicore"))]
+    let mut ml = public_keys
+        .iter()
+        .zip(hashes.iter())
+        .map(|(pk, h)| {
+            if pk.0.is_zero() {
+                is_valid.store(false, Ordering::Relaxed);
+            }
+            let pk = pk.as_affine().prepare();
+            let h = h.into_affine().prepare();
+            Bls12::miller_loop(&[(&pk, &h)])
+        })
+        .fold(Fq12::one(), |mut acc, cur| {
             acc.mul_assign(&cur);
             acc
         });
@@ -176,13 +214,18 @@ pub fn verify_messages(
     messages: &[&[u8]],
     public_keys: &[PublicKey],
 ) -> bool {
+    #[cfg(feature = "multicore")]
     let hashes: Vec<_> = messages.par_iter().map(|msg| hash(msg)).collect();
+
+    #[cfg(not(feature = "multicore"))]
+    let hashes: Vec<_> = messages.iter().map(|msg| hash(msg)).collect();
+
     verify(signature, &hashes, public_keys)
 }
 
 /// Verifies that the signature is the actual aggregated signature of messages - pubkeys.
 /// Calculated by `e(g1, signature) == \prod_{i = 0}^n e(pk_i, hash_i)`.
-#[cfg(feature = "blst")]
+#[cfg(all(feature = "blst", feature = "multicore"))]
 pub fn verify_messages(
     signature: &Signature,
     messages: &[&[u8]],
@@ -213,7 +256,6 @@ pub fn verify_messages(
     let valid = AtomicBool::new(true);
 
     let n_workers = std::cmp::min(rayon::current_num_threads(), n_messages);
-
     let mut pairings = messages
         .par_iter()
         .zip(public_keys.par_iter())
@@ -250,6 +292,56 @@ pub fn verify_messages(
     }
 
     valid.load(Ordering::Relaxed) && acc.finalverify(Some(&gtsig))
+}
+
+/// Verifies that the signature is the actual aggregated signature of messages - pubkeys.
+/// Calculated by `e(g1, signature) == \prod_{i = 0}^n e(pk_i, hash_i)`.
+#[cfg(all(feature = "blst", not(feature = "multicore")))]
+pub fn verify_messages(
+    signature: &Signature,
+    messages: &[&[u8]],
+    public_keys: &[PublicKey],
+) -> bool {
+    if messages.is_empty() || public_keys.is_empty() {
+        return false;
+    }
+
+    let n_messages = messages.len();
+
+    if n_messages != public_keys.len() {
+        return false;
+    }
+
+    // zero key & single message should fail
+    if n_messages == 1 && public_keys[0].0.is_zero() {
+        return false;
+    }
+
+    // Enforce that messages are distinct as a countermeasure against BLS's rogue-key attack.
+    // See Section 3.1. of the IRTF's BLS signatures spec:
+    // https://tools.ietf.org/html/draft-irtf-cfrg-bls-signature-02#section-3.1
+    if !blstrs::unique_messages(messages) {
+        return false;
+    }
+
+    let mut valid = true;
+    let mut pairing = blstrs::PairingG1G2::new(true, CSUITE);
+    for (message, public_key) in messages.iter().zip(public_keys.iter()) {
+        let res = pairing.aggregate(&public_key.0.into_affine(), None, message, &[]);
+        if res.is_err() {
+            valid = false;
+            break;
+        }
+
+        pairing.commit();
+    }
+
+    let mut gtsig = Fq12::zero();
+    if valid {
+        blstrs::PairingG1G2::aggregated(&mut gtsig, &signature.0);
+    }
+
+    valid && pairing.finalverify(Some(&gtsig))
 }
 
 #[cfg(test)]

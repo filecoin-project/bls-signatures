@@ -1,7 +1,3 @@
-extern crate bls_signatures;
-extern crate rand;
-extern crate rayon;
-
 use std::time::{Duration, Instant};
 
 #[cfg(feature = "blst")]
