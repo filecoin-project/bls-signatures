@@ -79,7 +79,7 @@ jobs:
           name: Test (nightly) (pairing, multicore)
           command: cargo +nightly-2020-11-18 test -Zpackage-features --verbose --frozen --all
           no_output_timeout: 15m
-          
+
       - run:
           name: Test (nightly) (blst, multicore)
           command: cargo +nightly-2020-11-18 test -Zpackage-features --no-default-features --features blst,multicore --verbose --frozen --all
@@ -89,7 +89,7 @@ jobs:
           name: Test (nightly) (pairing)
           command: cargo +nightly-2020-11-18 test -Zpackage-features --verbose --frozen --no-default-features --features pairing --all
           no_output_timeout: 15m
-          
+
       - run:
           name: Test (nightly) (blst)
           command: cargo +nightly-2020-11-18 test -Zpackage-features --no-default-features --features blst --verbose --frozen --all
@@ -146,7 +146,7 @@ jobs:
       - run:
           name: update apt
           command: apt-get update --fix-missing
-      
+
       - run:
           name: Install jq
           command: apt-get install jq -yqq
