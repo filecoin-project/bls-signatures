@@ -95,6 +95,10 @@ jobs:
           command: cargo +nightly-2020-11-18 test -Zpackage-features --no-default-features --features blst --verbose --frozen --all
           no_output_timeout: 15m
 
+      - run:
+          name: Check benches (nightly)
+          command: cargo +nightly-2020-11-18 check --all-targets --frozen --workspace
+
   rustfmt:
     docker:
       - image: filecoin/rust:latest
