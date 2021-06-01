@@ -1,6 +1,6 @@
 [package]
 name = "bls-signatures"
-version = "0.9.0"
+version = "0.10.0"
 authors = ["dignifiedquire <dignifiedquire@gmail.com>"]
 license = "MIT OR Apache-2.0"
 edition = "2018"
