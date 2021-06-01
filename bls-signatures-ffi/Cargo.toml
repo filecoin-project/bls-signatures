@@ -12,11 +12,11 @@ crate-type = ["staticlib"]
 bls-signatures = { path = "..", default-features = false }
 rand = "0.7"
 libc = "0.2"
-groupy = "0.3.0"
+groupy = "0.4.1"
 
 rayon = { version = "1.2.0", optional = true }
-blstrs = { version = "0.2", optional = true }
-paired = { version = "0.21.0", optional = true }
+blstrs = { version = "0.3.0", optional = true }
+paired = { version = "0.22.0", optional = true }
 
 [build-dependencies]
 cbindgen = { version = "0.13.1", default-features = false }
