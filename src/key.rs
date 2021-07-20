@@ -1,64 +1,72 @@
 use std::io::{self, Cursor, Read};
 
-use ff::PrimeField;
-use groupy::{CurveAffine, CurveProjective, EncodedPoint};
+use ff::{PrimeField, PrimeFieldBits};
+use group::Curve;
 use rand_core::{CryptoRng, RngCore};
 
 #[cfg(feature = "pairing")]
+use bls12_381::{hash_to_curve::HashToField, G1Affine, G1Projective, Scalar};
+#[cfg(feature = "pairing")]
 use hkdf::Hkdf;
-#[cfg(feature = "pairing")]
-use paired::bls12_381::{Fr, FrRepr, G1Affine, G1Compressed, G1};
-#[cfg(feature = "pairing")]
-use paired::BaseFromRO;
 #[cfg(feature = "pairing")]
 use sha2::{digest::generic_array::typenum::U48, digest::generic_array::GenericArray, Sha256};
 
+#[cfg(feature = "pairing")]
+pub(crate) struct ScalarRepr(pub [u64; 4]);
+
 #[cfg(feature = "blst")]
-use blstrs::{
-    G1Affine, G1Compressed, G1Projective as G1, G2Affine, Scalar as Fr, ScalarRepr as FrRepr,
-};
+use blstrs::{G1Affine, G1Projective, G2Affine, Scalar, ScalarRepr};
 
 use crate::error::Error;
 use crate::signature::*;
 
-#[derive(Debug, Copy, Clone, PartialEq)]
-pub struct PublicKey(pub(crate) G1);
+pub(crate) const G1_COMPRESSED_SIZE: usize = 48;
 
 #[derive(Debug, Copy, Clone, PartialEq)]
-pub struct PrivateKey(pub(crate) Fr);
+pub struct PublicKey(pub(crate) G1Projective);
 
-impl From<G1> for PublicKey {
-    fn from(val: G1) -> Self {
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub struct PrivateKey(pub(crate) Scalar);
+
+impl From<G1Projective> for PublicKey {
+    fn from(val: G1Projective) -> Self {
         PublicKey(val)
     }
 }
-impl From<PublicKey> for G1 {
+impl From<PublicKey> for G1Projective {
     fn from(val: PublicKey) -> Self {
         val.0
     }
 }
 
-impl From<Fr> for PrivateKey {
-    fn from(val: Fr) -> Self {
+impl From<Scalar> for PrivateKey {
+    fn from(val: Scalar) -> Self {
         PrivateKey(val)
     }
 }
 
-impl From<PrivateKey> for Fr {
+impl From<PrivateKey> for Scalar {
     fn from(val: PrivateKey) -> Self {
         val.0
     }
 }
 
-impl From<PrivateKey> for FrRepr {
+#[cfg(feature = "pairing")]
+impl From<PrivateKey> for ScalarRepr {
+    fn from(val: PrivateKey) -> Self {
+        ScalarRepr(val.0.to_le_bits().into_inner())
+    }
+}
+#[cfg(feature = "blst")]
+impl From<PrivateKey> for ScalarRepr {
     fn from(val: PrivateKey) -> Self {
         val.0.into_repr()
     }
 }
 
-impl<'a> From<&'a PrivateKey> for FrRepr {
+impl<'a> From<&'a PrivateKey> for ScalarRepr {
     fn from(val: &'a PrivateKey) -> Self {
-        val.0.into_repr()
+        (*val).into()
     }
 }
 
@@ -100,7 +108,7 @@ impl PrivateKey {
     #[cfg(feature = "pairing")]
     pub fn sign<T: AsRef<[u8]>>(&self, message: T) -> Signature {
         let mut p = hash(message.as_ref());
-        p.mul_assign(self.0);
+        p *= self.0;
 
         p.into()
     }
@@ -128,8 +136,8 @@ impl PrivateKey {
     /// Calculated by `pk = g1 * sk`.
     #[cfg(feature = "pairing")]
     pub fn public_key(&self) -> PublicKey {
-        let mut pk = G1::one();
-        pk.mul_assign(self.0);
+        let mut pk = G1Projective::generator();
+        pk *= self.0;
 
         PublicKey(pk)
     }
@@ -149,7 +157,7 @@ impl PrivateKey {
 
     /// Deserializes a private key from the field element as a decimal number.
     pub fn from_string<T: AsRef<str>>(s: T) -> Result<Self, Error> {
-        match Fr::from_str(s.as_ref()) {
+        match Scalar::from_str(s.as_ref()) {
             Some(f) => Ok(f.into()),
             None => Err(Error::InvalidPrivateKey),
         }
@@ -158,7 +166,7 @@ impl PrivateKey {
 
 impl Serialize for PrivateKey {
     fn write_bytes(&self, dest: &mut impl io::Write) -> io::Result<()> {
-        for digit in self.0.into_repr().as_ref().iter() {
+        for digit in self.0.to_le_bits().as_buffer() {
             dest.write_all(&digit.to_le_bytes())?;
         }
 
@@ -166,29 +174,29 @@ impl Serialize for PrivateKey {
     }
 
     fn from_bytes(raw: &[u8]) -> Result<Self, Error> {
-        const FR_SIZE: usize = (Fr::NUM_BITS as usize + 8 - 1) / 8;
+        const FR_SIZE: usize = (Scalar::NUM_BITS as usize + 8 - 1) / 8;
         if raw.len() != FR_SIZE {
             return Err(Error::SizeMismatch);
         }
 
-        let mut res = FrRepr::default();
+        let mut res = [0u64; 4];
         let mut reader = Cursor::new(raw);
         let mut buf = [0; 8];
 
-        for digit in res.0.as_mut().iter_mut() {
+        for digit in &mut res {
             reader.read_exact(&mut buf)?;
             *digit = u64::from_le_bytes(buf);
         }
 
         // TODO: once zero keys are rejected, insert check for zero.
 
-        Ok(Fr::from_repr(res)?.into())
+        Ok(Scalar::from_raw(res).into())
     }
 }
 
 impl PublicKey {
     pub fn as_affine(&self) -> G1Affine {
-        self.0.into_affine()
+        self.0.to_affine()
     }
 
     pub fn verify<T: AsRef<[u8]>>(&self, sig: Signature, message: T) -> bool {
@@ -198,30 +206,31 @@ impl PublicKey {
 
 impl Serialize for PublicKey {
     fn write_bytes(&self, dest: &mut impl io::Write) -> io::Result<()> {
-        let t = self.0.into_affine();
-        let tmp = G1Compressed::from_affine(t);
+        let t = self.0.to_affine();
+        let tmp = t.to_compressed();
         dest.write_all(tmp.as_ref())?;
 
         Ok(())
     }
 
     fn from_bytes(raw: &[u8]) -> Result<Self, Error> {
-        if raw.len() != G1Compressed::size() {
+        if raw.len() != G1_COMPRESSED_SIZE {
             return Err(Error::SizeMismatch);
         }
 
-        let mut res = G1Compressed::empty();
+        let mut res = [0u8; G1_COMPRESSED_SIZE];
         res.as_mut().copy_from_slice(raw);
-        let affine = res.into_affine()?;
+        let affine: G1Affine =
+            Option::from(G1Affine::from_compressed(&res)).ok_or(Error::GroupDecode)?;
 
-        Ok(PublicKey(affine.into_projective()))
+        Ok(PublicKey(affine.into()))
     }
 }
 
 /// Generates a secret key as defined in
 /// https://tools.ietf.org/html/draft-irtf-cfrg-bls-signature-02#section-2.3
 #[cfg(feature = "pairing")]
-fn key_gen<T: AsRef<[u8]>>(data: T) -> Fr {
+fn key_gen<T: AsRef<[u8]>>(data: T) -> Scalar {
     // "BLS-SIG-KEYGEN-SALT-"
     const SALT: &[u8] = b"BLS-SIG-KEYGEN-SALT-";
 
@@ -239,7 +248,7 @@ fn key_gen<T: AsRef<[u8]>>(data: T) -> Fr {
     let mut result = GenericArray::<u8, U48>::default();
     assert!(prk.expand(&[0, 48], &mut result).is_ok());
 
-    Fr::from_okm(&result)
+    Scalar::from_okm(&result)
 }
 
 /// Generates a secret key as defined in
@@ -302,14 +311,14 @@ mod tests {
         ]);
 
         #[cfg(feature = "pairing")]
-        let expect = FrRepr([
+        let expect = ScalarRepr([
             0xa9f8187b89e6d49a,
             0xf870f34063ce4b16,
             0xc2aa3c1fff1bbaa3,
             0x60417787ee46e23f,
         ]);
 
-        assert_eq!(fr_val, Fr::from_repr(expect).unwrap());
+        assert_eq!(fr_val, Scalar::from_raw(expect.0));
     }
 
     #[test]
