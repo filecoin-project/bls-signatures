@@ -1,9 +1,9 @@
 use std::time::{Duration, Instant};
 
-#[cfg(feature = "blst")]
-use blstrs::G2Projective as G2;
 #[cfg(feature = "pairing")]
-use paired::bls12_381::G2;
+use bls12_381::G2Projective;
+#[cfg(feature = "blst")]
+use blstrs::G2Projective;
 
 use bls_signatures::*;
 use rand::{Rng, SeedableRng};
@@ -79,7 +79,7 @@ fn run(num_messages: usize) {
         serialized_signature = aggregated_signature.as_bytes();
     });
 
-    let hashes: Vec<G2>;
+    let hashes: Vec<G2Projective>;
     measure!("hashing messages", num_messages, {
         hashes = messages
             .par_iter()
