@@ -1,14 +1,13 @@
 use std::slice::from_raw_parts;
 
+#[cfg(feature = "pairing")]
+use bls12_381::{G2Affine, G2Projective};
 use bls_signatures::{
     aggregate as aggregate_sig, hash as hash_sig, verify as verify_sig,
-    verify_messages as verify_messages_sig, PrivateKey, PublicKey, Serialize, Signature,
+    verify_messages as verify_messages_sig, Error, PrivateKey, PublicKey, Serialize, Signature,
 };
 #[cfg(feature = "blst")]
-use blstrs::{G2Affine, G2Compressed};
-use groupy::{CurveAffine, CurveProjective, EncodedPoint, GroupDecodingError};
-#[cfg(feature = "pairing")]
-use paired::bls12_381::{G2Affine, G2Compressed};
+use blstrs::{G2Affine, G2Projective};
 use rand::rngs::OsRng;
 #[cfg(feature = "multicore")]
 use rayon::prelude::*;
@@ -19,6 +18,7 @@ const SIGNATURE_BYTES: usize = 96;
 const PRIVATE_KEY_BYTES: usize = 32;
 const PUBLIC_KEY_BYTES: usize = 48;
 const DIGEST_BYTES: usize = 96;
+const G2_COMPRESSED_SIZE: usize = 96;
 
 type BLSSignature = [u8; SIGNATURE_BYTES];
 type BLSPrivateKey = [u8; PRIVATE_KEY_BYTES];
@@ -54,7 +54,7 @@ pub unsafe extern "C" fn hash(
 
     // prep response
     let mut raw_digest: [u8; DIGEST_BYTES] = [0; DIGEST_BYTES];
-    raw_digest.copy_from_slice(digest.into_affine().into_compressed().as_ref());
+    raw_digest.copy_from_slice(G2Affine::from(digest).to_compressed().as_ref());
 
     let response = responses::HashResponse { digest: raw_digest };
 
@@ -142,15 +142,14 @@ pub unsafe extern "C" fn verify(
     let raw = raw_digests.chunks(DIGEST_BYTES);
 
     let digests: Vec<_> = try_ffi!(
-        raw.map(|item: &[u8]| {
-            let mut digest = G2Compressed::empty();
+        raw.map(|item: &[u8]| -> Result<G2Projective, Error> {
+            let mut digest = [0u8; G2_COMPRESSED_SIZE];
             digest.as_mut().copy_from_slice(item);
 
-            let affine: G2Affine = digest.into_affine()?;
-            let projective = affine.into_projective();
-            Ok(projective)
+            let affine: Option<G2Affine> = Option::from(G2Affine::from_compressed(&digest));
+            affine.map(Into::into).ok_or(Error::CurveDecode)
         })
-        .collect::<Result<Vec<_>, GroupDecodingError>>(),
+        .collect::<Result<Vec<G2Projective>, Error>>(),
         0
     );
 
