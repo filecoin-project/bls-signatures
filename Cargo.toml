@@ -11,10 +11,6 @@ homepage = "https://github.com/filecoin-project/bls-signatures"
 repository = "https://github.com/filecoin-project/bls-signatures"
 readme = "README.md"
 
-[package.metadata.release]
-pre-release-commit-message = "chore(release): release {{version}}"
-pro-release-commit-message = "chore(release): starting development cycle for {{next_version}}"
-
 [dependencies]
 rayon = { version = "1", optional = true }
 rand_core = "0.5.1"
@@ -54,3 +50,7 @@ rand_chacha = "0.2.2"
 [[example]]
 name = "verify"
 required-features = ["multicore"]
+
+
+[patch.crates-io]
+bls12_381 = { git = "https://github.com/vihu/bls12_381", branch = "rg/millerloopresult-helpers"}

@@ -1,14 +1,13 @@
 use std::io;
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use group::Group;
 #[cfg(feature = "multicore")]
 use rayon::prelude::*;
 
 #[cfg(feature = "pairing")]
 use bls12_381::{
     hash_to_curve::{ExpandMsgXmd, HashToCurve},
-    Bls12, G1Affine, G2Affine, G2Projective,
+    Bls12, G1Affine, G2Affine, G2Projective, Gt, MillerLoopResult,
 };
 #[cfg(feature = "pairing")]
 use pairing_lib::MultiMillerLoop;
@@ -112,12 +111,11 @@ pub fn aggregate(signatures: &[Signature]) -> Result<Signature, Error> {
 
     let res = signatures
         .into_iter()
-        .fold(G2::zero(), |mut acc, signature| {
-            acc.add_assign_mixed(&signature.0);
-            acc
+        .fold(G2Projective::identity(), |acc, signature| {
+            acc + &signature.0
         });
 
-    Ok(Signature(res.into_affine()))
+    Ok(Signature(res.into()))
 }
 
 /// Verifies that the signature is the actual aggregated signature of hashes - pubkeys.
@@ -163,36 +161,31 @@ pub fn verify(signature: &Signature, hashes: &[G2Projective], public_keys: &[Pub
             let h = G2Affine::from(h).into();
             Bls12::multi_miller_loop(&[(&pk, &h)])
         })
-        .reduce(
-            || {
-                todo!() /*bls12_381::MillerLoopResult::default()*/
-            },
-            |acc, cur| acc + cur,
-        );
+        .reduce(MillerLoopResult::default, |acc, cur| &acc * &cur);
 
     #[cfg(not(feature = "multicore"))]
     let mut ml = public_keys
         .iter()
         .zip(hashes.iter())
         .map(|(pk, h)| {
-            if pk.0.is_zero() {
+            if pk.0.is_identity().into() {
                 is_valid.store(false, Ordering::Relaxed);
             }
             let pk = pk.as_affine();
             let h = G2Affine::from(h).into();
             Bls12::multi_miller_loop(&[(&pk, &h)])
         })
-        .fold(Gt::identity(), |mut acc, cur| acc + cur);
+        .fold(MillerLoopResult::default(), |acc, cur| &acc * &cur);
 
     if !is_valid.load(Ordering::Relaxed) {
         return false;
     }
 
-    let g1_neg = -G1Affine::identity();
+    let g1_neg = -G1Affine::generator();
 
     ml = ml + Bls12::multi_miller_loop(&[(&g1_neg, &signature.0.into())]);
 
-    ml.final_exponentiation().is_identity().into()
+    ml.final_exponentiation() == Gt::identity()
 }
 
 /// Verifies that the signature is the actual aggregated signature of messages - pubkeys.
