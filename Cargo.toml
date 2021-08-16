@@ -36,7 +36,7 @@ members = [
 default = ["pairing", "multicore"]
 multicore = ["rayon"]
 pairing = [ "pairing_lib", "bls12_381", "sha2", "hkdf" ]
-blst = [ "blst_lib", "blstrs" ]
+blst = [ "blst_lib", "blstrs", "pairing_lib" ]
 blst-portable = [ "blst_lib", "blst_lib/portable", "blstrs/portable" ]
 
 [dev-dependencies]
@@ -54,3 +54,4 @@ required-features = ["multicore"]
 
 [patch.crates-io]
 bls12_381 = { git = "https://github.com/vihu/bls12_381", branch = "rg/millerloopresult-helpers"}
+blstrs = { git = "https://github.com/filecoin-project/blstrs", branch = "halo"}

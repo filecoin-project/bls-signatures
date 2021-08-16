@@ -9,11 +9,14 @@ use bls12_381::{
     hash_to_curve::{ExpandMsgXmd, HashToCurve},
     Bls12, G1Affine, G2Affine, G2Projective, Gt, MillerLoopResult,
 };
-#[cfg(feature = "pairing")]
 use pairing_lib::MultiMillerLoop;
 
 #[cfg(feature = "blst")]
-use blstrs::{Bls12, Engine, Fp12, G1Affine, G2Affine, G2Projective, PairingCurveAffine};
+use blstrs::{Bls12, G1Affine, G2Affine, G2Projective, Gt, MillerLoopResult};
+#[cfg(feature = "blst")]
+use group::{prime::PrimeCurveAffine, Group};
+#[cfg(feature = "blst")]
+use pairing_lib::MillerLoopResult as _;
 
 use crate::error::Error;
 use crate::key::*;
@@ -92,11 +95,11 @@ pub fn aggregate(signatures: &[Signature]) -> Result<Signature, Error> {
 
     let res = signatures
         .into_par_iter()
-        .fold(G2Projective::default, |mut acc, signature| {
+        .fold(G2Projective::identity, |mut acc, signature| {
             acc += &signature.0;
             acc
         })
-        .reduce(G2Projective::default, |acc, val| acc + val);
+        .reduce(G2Projective::identity, |acc, val| acc + val);
 
     Ok(Signature(res.into()))
 }
@@ -161,7 +164,7 @@ pub fn verify(signature: &Signature, hashes: &[G2Projective], public_keys: &[Pub
             let h = G2Affine::from(h).into();
             Bls12::multi_miller_loop(&[(&pk, &h)])
         })
-        .reduce(MillerLoopResult::default, |acc, cur| &acc * &cur);
+        .reduce(MillerLoopResult::default, |acc, cur| acc + cur);
 
     #[cfg(not(feature = "multicore"))]
     let mut ml = public_keys
@@ -175,7 +178,7 @@ pub fn verify(signature: &Signature, hashes: &[G2Projective], public_keys: &[Pub
             let h = G2Affine::from(h).into();
             Bls12::multi_miller_loop(&[(&pk, &h)])
         })
-        .fold(MillerLoopResult::default(), |acc, cur| &acc * &cur);
+        .fold(MillerLoopResult::default(), |acc, cur| acc + cur);
 
     if !is_valid.load(Ordering::Relaxed) {
         return false;
@@ -224,7 +227,7 @@ pub fn verify_messages(
     }
 
     // zero key & single message should fail
-    if n_messages == 1 && public_keys[0].0.is_zero() {
+    if n_messages == 1 && public_keys[0].0.is_identity().into() {
         return false;
     }
 
@@ -246,7 +249,7 @@ pub fn verify_messages(
             let mut pairing = blstrs::PairingG1G2::new(true, CSUITE);
 
             for (message, public_key) in chunk {
-                let res = pairing.aggregate(&public_key.0.into_affine(), None, message, &[]);
+                let res = pairing.aggregate(&public_key.0.into(), None, message, &[]);
                 if res.is_err() {
                     valid.store(false, Ordering::Relaxed);
                     break;
@@ -295,7 +298,7 @@ pub fn verify_messages(
     }
 
     // zero key & single message should fail
-    if n_messages == 1 && public_keys[0].0.is_zero() {
+    if n_messages == 1 && public_keys[0].0.is_identity().into() {
         return false;
     }
 
@@ -309,7 +312,7 @@ pub fn verify_messages(
     let mut valid = true;
     let mut pairing = blstrs::PairingG1G2::new(true, CSUITE);
     for (message, public_key) in messages.iter().zip(public_keys.iter()) {
-        let res = pairing.aggregate(&public_key.0.into_affine(), None, message, &[]);
+        let res = pairing.aggregate(&public_key.0.into(), None, message, &[]);
         if res.is_err() {
             valid = false;
             break;
@@ -318,7 +321,7 @@ pub fn verify_messages(
         pairing.commit();
     }
 
-    let mut gtsig = Fq12::zero();
+    let mut gtsig = Gt::default();
     if valid {
         blstrs::PairingG1G2::aggregated(&mut gtsig, &signature.0);
     }
@@ -340,7 +343,9 @@ mod tests {
     #[cfg(feature = "pairing")]
     use bls12_381::{G1Projective, Scalar};
     #[cfg(feature = "blst")]
-    use blstrs::{G1Compressed, G1Projective, Scalar};
+    use blstrs::{G1Projective, Scalar};
+    #[cfg(feature = "blst")]
+    use ff::Field;
 
     #[test]
     fn basic_aggregation() {

@@ -1,4 +1,4 @@
-use std::io::{self, Cursor, Read};
+use std::io;
 
 use ff::{PrimeField, PrimeFieldBits};
 use group::Curve;
@@ -11,11 +11,12 @@ use hkdf::Hkdf;
 #[cfg(feature = "pairing")]
 use sha2::{digest::generic_array::typenum::U48, digest::generic_array::GenericArray, Sha256};
 
-#[cfg(feature = "pairing")]
 pub(crate) struct ScalarRepr(pub [u64; 4]);
 
 #[cfg(feature = "blst")]
-use blstrs::{G1Affine, G1Projective, G2Affine, Scalar, ScalarRepr};
+use blstrs::{G1Affine, G1Projective, G2Affine, Scalar};
+#[cfg(feature = "blst")]
+use group::prime::PrimeCurveAffine;
 
 use crate::error::Error;
 use crate::signature::*;
@@ -51,16 +52,9 @@ impl From<PrivateKey> for Scalar {
     }
 }
 
-#[cfg(feature = "pairing")]
 impl From<PrivateKey> for ScalarRepr {
     fn from(val: PrivateKey) -> Self {
         ScalarRepr(val.0.to_le_bits().into_inner())
-    }
-}
-#[cfg(feature = "blst")]
-impl From<PrivateKey> for ScalarRepr {
-    fn from(val: PrivateKey) -> Self {
-        val.0.into_repr()
     }
 }
 
@@ -118,7 +112,7 @@ impl PrivateKey {
     #[cfg(feature = "blst")]
     pub fn sign<T: AsRef<[u8]>>(&self, message: T) -> Signature {
         let p = hash(message.as_ref());
-        let mut sig = G2Affine::zero();
+        let mut sig = G2Affine::identity();
 
         unsafe {
             blst_lib::blst_sign_pk2_in_g1(
@@ -146,13 +140,13 @@ impl PrivateKey {
     /// Calculated by `pk = g1 * sk`.
     #[cfg(feature = "blst")]
     pub fn public_key(&self) -> PublicKey {
-        let mut pk = G1Affine::zero();
+        let mut pk = G1Affine::identity();
 
         unsafe {
             blst_lib::blst_sk_to_pk2_in_g1(std::ptr::null_mut(), pk.as_mut(), &self.0.into());
         }
 
-        PublicKey(pk.into_projective())
+        PublicKey(pk.into())
     }
 
     /// Deserializes a private key from the field element as a decimal number.
@@ -179,18 +173,14 @@ impl Serialize for PrivateKey {
             return Err(Error::SizeMismatch);
         }
 
-        let mut res = [0u64; 4];
-        let mut reader = Cursor::new(raw);
-        let mut buf = [0; 8];
-
-        for digit in &mut res {
-            reader.read_exact(&mut buf)?;
-            *digit = u64::from_le_bytes(buf);
-        }
+        let mut res = [0u8; FR_SIZE];
+        res.copy_from_slice(&raw[..FR_SIZE]);
 
         // TODO: once zero keys are rejected, insert check for zero.
 
-        Ok(Scalar::from_raw(res).into())
+        Scalar::from_repr(res)
+            .map(Into::into)
+            .ok_or(Error::InvalidPrivateKey)
     }
 }
 
@@ -254,7 +244,7 @@ fn key_gen<T: AsRef<[u8]>>(data: T) -> Scalar {
 /// Generates a secret key as defined in
 /// https://tools.ietf.org/html/draft-irtf-cfrg-bls-signature-02#section-2.3
 #[cfg(feature = "blst")]
-fn key_gen<T: AsRef<[u8]>>(data: T) -> Fr {
+fn key_gen<T: AsRef<[u8]>>(data: T) -> Scalar {
     use std::convert::TryInto;
 
     let data = data.as_ref();
@@ -303,22 +293,23 @@ mod tests {
         let key_material = "hello world (it's a secret!) very secret stuff";
         let fr_val = key_gen(key_material);
         #[cfg(feature = "blst")]
-        let expect = FrRepr([
+        let expect = Scalar::from_u64s_le(&[
             0x8a223b0f9e257f7d,
             0x2d80f7b7f5ea6cc4,
             0xcc9e063a0ea0009c,
             0x4a73baed5cb75109,
-        ]);
+        ])
+        .unwrap();
 
         #[cfg(feature = "pairing")]
-        let expect = ScalarRepr([
+        let expect = Scalar::from_raw([
             0xa9f8187b89e6d49a,
             0xf870f34063ce4b16,
             0xc2aa3c1fff1bbaa3,
             0x60417787ee46e23f,
         ]);
 
-        assert_eq!(fr_val, Scalar::from_raw(expect.0));
+        assert_eq!(fr_val, expect);
     }
 
     #[test]
