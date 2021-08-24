@@ -54,5 +54,5 @@ required-features = ["multicore"]
 
 
 [patch.crates-io]
-bls12_381 = { git = "https://github.com/vihu/bls12_381", branch = "rg/millerloopresult-helpers"}
+bls12_381 = { git = "https://github.com/dignifiedquire/bls12_381", branch = "feat-default-result"}
 blstrs = { git = "https://github.com/filecoin-project/blstrs", branch = "halo"}

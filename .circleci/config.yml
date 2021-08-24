@@ -43,7 +43,7 @@ jobs:
             - cargo-v4-{{ checksum "rust-toolchain" }}-{{ checksum "Cargo.toml" }}-{{ checksum "Cargo.lock" }}-{{ arch }}
       - run:
           name: Test (stable)
-          command: cargo +stable test --verbose --frozen --all
+          command: cargo test --verbose --frozen --all
           no_output_timeout: 15m
 
   test_release:
@@ -60,8 +60,8 @@ jobs:
       - run:
           name: Test (stable) in release profile (pairing)
           command: |
-            cargo +stable test --verbose --release --frozen --all
-            cargo +stable build --examples --release --frozen --all
+            cargo test --verbose --release --frozen --all
+            cargo build --examples --release --frozen --all
 
 
   test_nightly:
