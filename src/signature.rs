@@ -186,7 +186,7 @@ pub fn verify(signature: &Signature, hashes: &[G2Projective], public_keys: &[Pub
 
     let g1_neg = -G1Affine::generator();
 
-    ml = ml + Bls12::multi_miller_loop(&[(&g1_neg, &signature.0.into())]);
+    ml += Bls12::multi_miller_loop(&[(&g1_neg, &signature.0.into())]);
 
     ml.final_exponentiation() == Gt::identity()
 }

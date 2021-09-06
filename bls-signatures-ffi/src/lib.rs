@@ -8,6 +8,7 @@ use bls_signatures::{
 };
 #[cfg(feature = "blst")]
 use blstrs::{G2Affine, G2Projective};
+use group::GroupEncoding;
 use rand::rngs::OsRng;
 #[cfg(feature = "multicore")]
 use rayon::prelude::*;
@@ -54,7 +55,7 @@ pub unsafe extern "C" fn hash(
 
     // prep response
     let mut raw_digest: [u8; DIGEST_BYTES] = [0; DIGEST_BYTES];
-    raw_digest.copy_from_slice(G2Affine::from(digest).to_compressed().as_ref());
+    raw_digest.copy_from_slice(digest.to_bytes().as_ref());
 
     let response = responses::HashResponse { digest: raw_digest };
 

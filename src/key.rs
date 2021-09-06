@@ -151,7 +151,7 @@ impl PrivateKey {
 
     /// Deserializes a private key from the field element as a decimal number.
     pub fn from_string<T: AsRef<str>>(s: T) -> Result<Self, Error> {
-        match Scalar::from_str(s.as_ref()) {
+        match Scalar::from_str_vartime(s.as_ref()) {
             Some(f) => Ok(f.into()),
             None => Err(Error::InvalidPrivateKey),
         }
@@ -178,7 +178,7 @@ impl Serialize for PrivateKey {
 
         // TODO: once zero keys are rejected, insert check for zero.
 
-        Scalar::from_repr(res)
+        Scalar::from_repr_vartime(res)
             .map(Into::into)
             .ok_or(Error::InvalidPrivateKey)
     }

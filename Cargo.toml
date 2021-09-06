@@ -16,12 +16,13 @@ readme = "README.md"
 rayon = { version = "1", optional = true }
 rand_core = "0.6.0"
 thiserror = "1.0"
+subtle = "2.2.1"
 
-ff = "0.10"
-group = "0.10"
-pairing_lib = { version = "0.20.0", package = "pairing" }
+ff = "0.11"
+group = "0.11"
+pairing_lib = { version = "0.21.0", package = "pairing" }
 
-bls12_381 = { version = "=0.5.0", optional = true, features = ["experimental"] }
+bls12_381 = { version = "=0.6.0", optional = true, features = ["experimental"] }
 sha2 = { version = "0.9", optional = true }
 hkdf = { version = "0.10.0", optional = true }
 
@@ -54,5 +55,4 @@ required-features = ["multicore"]
 
 
 [patch.crates-io]
-bls12_381 = { git = "https://github.com/dignifiedquire/bls12_381", branch = "feat-default-result"}
 blstrs = { git = "https://github.com/filecoin-project/blstrs", branch = "halo"}
