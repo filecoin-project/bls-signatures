@@ -20,7 +20,7 @@ jobs:
       - run: cargo fetch
       - run: rustc +stable --version
       - run: rustc +$(cat rust-toolchain) --version
-      - run: rustup install nightly-2020-11-18
+      - run: rustup install nightly-2021-08-09
       - persist_to_workspace:
           root: "."
           paths:
@@ -43,7 +43,7 @@ jobs:
             - cargo-v4-{{ checksum "rust-toolchain" }}-{{ checksum "Cargo.toml" }}-{{ checksum "Cargo.lock" }}-{{ arch }}
       - run:
           name: Test (stable)
-          command: cargo +stable test --verbose --frozen --all
+          command: cargo test --verbose --frozen --all
           no_output_timeout: 15m
 
   test_release:
@@ -60,8 +60,8 @@ jobs:
       - run:
           name: Test (stable) in release profile (pairing)
           command: |
-            cargo +stable test --verbose --release --frozen --all
-            cargo +stable build --examples --release --frozen --all
+            cargo test --verbose --release --frozen --all
+            cargo build --examples --release --frozen --all
 
 
   test_nightly:
@@ -76,28 +76,28 @@ jobs:
           keys:
             - cargo-v4-{{ checksum "rust-toolchain" }}-{{ checksum "Cargo.toml" }}-{{ checksum "Cargo.lock" }}-{{ arch }}
       - run:
-          name: Test (nightly) (pairing, multicore)
-          command: cargo +nightly-2020-11-18 test -Zpackage-features --verbose --frozen --all
+          name: Test (pairing, multicore)
+          command: cargo test --verbose --frozen --all
           no_output_timeout: 15m
 
       - run:
-          name: Test (nightly) (blst, multicore)
-          command: cargo +nightly-2020-11-18 test -Zpackage-features --no-default-features --features blst,multicore --verbose --frozen --all
+          name: Test (blst, multicore)
+          command: cargo test --no-default-features --features blst,multicore --verbose --frozen --all
           no_output_timeout: 15m
 
       - run:
-          name: Test (nightly) (pairing)
-          command: cargo +nightly-2020-11-18 test -Zpackage-features --verbose --frozen --no-default-features --features pairing --all
+          name: Test (pairing)
+          command: cargo test --verbose --frozen --no-default-features --features pairing --all
           no_output_timeout: 15m
 
       - run:
-          name: Test (nightly) (blst)
-          command: cargo +nightly-2020-11-18 test -Zpackage-features --no-default-features --features blst --verbose --frozen --all
+          name: Test (blst)
+          command: cargo test --no-default-features --features blst --verbose --frozen --all
           no_output_timeout: 15m
 
       - run:
           name: Check benches (nightly)
-          command: cargo +nightly-2020-11-18 check --all-targets --frozen --workspace
+          command: cargo +nightly-2021-08-09 check --all-targets --frozen --workspace
 
   rustfmt:
     docker:
@@ -156,7 +156,7 @@ jobs:
 
   publish_darwin_release:
     macos:
-      xcode: "10.0.0"
+      xcode: "12.5.0"
     working_directory: ~/crate
     steps:
       - run:

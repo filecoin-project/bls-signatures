@@ -37,7 +37,7 @@ MIT or Apache 2.0
 ## Contribution
 
 Unless you explicitly state otherwise, any contribution intentionally submitted
-for inclusion in rust-accumulators by you, as defined in the Apache-2.0 license, shall be
+for inclusion in bls-signatures by you, as defined in the Apache-2.0 license, shall be
 dual licensed as above, without any additional terms or conditions.
 
 [circleci-shield]: https://img.shields.io/circleci/project/github/filecoin-project/bls-signatures.svg?style=flat-square

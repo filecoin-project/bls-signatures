@@ -6,10 +6,12 @@ pub enum Error {
     SizeMismatch,
     #[error("Io error: {0}")]
     Io(#[from] std::io::Error),
-    #[error("Group decode error: {0}")]
-    GroupDecode(#[from] groupy::GroupDecodingError),
-    #[error("Prime field decode error: {0}")]
-    FieldDecode(#[from] ff::PrimeFieldDecodingError),
+    #[error("Group decode error")]
+    GroupDecode,
+    #[error("Curve decode error")]
+    CurveDecode,
+    #[error("Prime field decode error")]
+    FieldDecode,
     #[error("Invalid Private Key")]
     InvalidPrivateKey,
     #[error("Zero sized input")]
