@@ -323,4 +323,24 @@ mod tests {
 
         assert!(pk.verify(sig, msg));
     }
+
+    #[test]
+    fn test_from_bytes() {
+        // Larger than the modulus
+        assert!(PrivateKey::from_bytes(&[255u8; 32]).is_err());
+        // exactly the modulus
+        let modulus = Scalar::char_le_bits();
+
+        // save because little endian + size matches
+        let modulus_u8: &[u8] = unsafe { std::mem::transmute(modulus.as_raw_slice()) };
+        assert!(PrivateKey::from_bytes(&modulus_u8[..]).is_err());
+
+        // simple numbers below the modulus
+        assert!(PrivateKey::from_bytes(&Scalar::from(1).to_repr()).is_ok());
+        assert!(PrivateKey::from_bytes(&Scalar::from(10).to_repr()).is_ok());
+        assert!(PrivateKey::from_bytes(&Scalar::from(100).to_repr()).is_ok());
+
+        // Larger than the modulus
+        assert!(PublicKey::from_bytes(&[255u8; 48]).is_err());
+    }
 }
