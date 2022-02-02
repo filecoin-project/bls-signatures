@@ -11,12 +11,12 @@ use hkdf::Hkdf;
 #[cfg(feature = "pairing")]
 use sha2::{digest::generic_array::typenum::U48, digest::generic_array::GenericArray, Sha256};
 
-pub(crate) struct ScalarRepr(pub [u64; 4]);
-
 #[cfg(feature = "blst")]
 use blstrs::{G1Affine, G1Projective, G2Affine, Scalar};
 #[cfg(feature = "blst")]
 use group::prime::PrimeCurveAffine;
+
+pub(crate) struct ScalarRepr(<Scalar as PrimeFieldBits>::ReprBits);
 
 use crate::error::Error;
 use crate::signature::*;
