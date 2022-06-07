@@ -4,12 +4,12 @@ compile_error!("only pairing or blst can be enabled");
 mod error;
 
 #[cfg(feature = "min-sig")]
-#[path="key_min_sig"] mod key;
+#[path="src/key_min_sig"] mod key;
 #[cfg(not(feature = "min-sig"))]
 mod key;
 
 #[cfg(feature = "min-sig")]
-#[path="signature_min_sig"] mod signature;
+#[path="src/signature_min_sig"] mod signature;
 #[cfg(not(feature = "min-sig"))]
 mod signature;
 
