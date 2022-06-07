@@ -176,7 +176,7 @@ pub fn verify(signature: &Signature, hashes: &[G1Projective], public_keys: &[Pub
             }
             let pk = pk.as_affine();
             let h = G1Affine::from(h).into();
-            Bls12::multi_miller_loop(&[(&h, &pk)])
+            Bls12::multi_miller_loop(&[(&h, &pk.into())])
         })
         .fold(MillerLoopResult::default(), |acc, cur| acc + cur);
 
@@ -186,7 +186,7 @@ pub fn verify(signature: &Signature, hashes: &[G1Projective], public_keys: &[Pub
 
     let g2_neg = -G2Affine::generator();
 
-    ml += Bls12::multi_miller_loop(&[(&signature.0.into(), &g2_neg)]);
+    ml += Bls12::multi_miller_loop(&[(&signature.0.into(), &g2_neg.into())]);
 
     ml.final_exponentiation() == Gt::identity()
 }
