@@ -6,7 +6,7 @@ on:
     branches: master
 
 env:
-  MSRV: 1.51.0
+  MSRV: 1.56.0
   RUSTFLAGS: "-Dwarnings"
   CARGO_INCREMENTAL: 0
   RUST_BACKTRACE: 1
@@ -21,39 +21,41 @@ jobs:
       - id: msrv
         run: echo "::set-output name=msrv::$(echo $MSRV)"
 
-  linux_foreign:
-    strategy:
-      matrix:
-        include:
-          # 64-bit Linux/arm64
-          - target: aarch64-unknown-linux-gnu
-            rust: nightly
-            arch: aarch64
-
-    runs-on: ubuntu-18.04
-    steps:
-      - uses: actions/checkout@v2
-      - uses: uraimo/run-on-arch-action@v2.1.1
-        name: Run commands
-        id: runcmd
-        with:
-          arch: aarch64
-          distro: ubuntu18.04
-
-          # Not required, but speeds up builds by storing container images in
-          # a GitHub package registry.
-          githubToken: ${{ github.token }}
-
-          install: |
-            apt-get update -q -y
-            apt-get install -q -y ocl-icd-opencl-dev curl build-essential
-            curl https://sh.rustup.rs -sSf | sh -s -- --profile minimal --default-toolchain ${{ matrix.rust }} -y
-            source $HOME/.cargo/env
-          
-          run: |
-            $HOME/.cargo/bin/cargo test --release --no-default-features --features pairing,multicore --target ${{ matrix.target }}
-            $HOME/.cargo/bin/cargo test --release --no-default-features --features blst,multicore --target ${{ matrix.target }}
-            $HOME/.cargo/bin/cargo test --release --no-default-features --features blst,multicore,blst-portable --target ${{ matrix.target }}
+  # NOTE vmx 2022-06-14: currently doesn't work, hence run it on CircleCI
+  # for now.
+  #linux_foreign:
+  #  strategy:
+  #    matrix:
+  #      include:
+  #        # 64-bit Linux/arm64
+  #        - target: aarch64-unknown-linux-gnu
+  #          rust: nightly
+  #          arch: aarch64
+  #
+  #  runs-on: ubuntu-18.04
+  #  steps:
+  #    - uses: actions/checkout@v2
+  #    - uses: uraimo/run-on-arch-action@v2.1.1
+  #      name: Run commands
+  #      id: runcmd
+  #      with:
+  #        arch: aarch64
+  #        distro: ubuntu18.04
+  #
+  #        # Not required, but speeds up builds by storing container images in
+  #        # a GitHub package registry.
+  #        githubToken: ${{ github.token }}
+  #
+  #        install: |
+  #          apt-get update -q -y
+  #          apt-get install -q -y ocl-icd-opencl-dev curl build-essential
+  #          curl https://sh.rustup.rs -sSf | sh -s -- --profile minimal --default-toolchain ${{ matrix.rust }} -y
+  #          source $HOME/.cargo/env
+  #
+  #        run: |
+  #          $HOME/.cargo/bin/cargo test --release --no-default-features --features pairing,multicore --target ${{ matrix.target }}
+  #          $HOME/.cargo/bin/cargo test --release --no-default-features --features blst,multicore --target ${{ matrix.target }}
+  #          $HOME/.cargo/bin/cargo test --release --no-default-features --features blst,multicore,blst-portable --target ${{ matrix.target }}
 
   # Linux tests
   linux:

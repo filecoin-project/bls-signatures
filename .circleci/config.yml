@@ -20,7 +20,7 @@ jobs:
       - run: cargo fetch
       - run: rustc +stable --version
       - run: rustc +$(cat rust-toolchain) --version
-      - run: rustup install nightly-2021-08-09
+      - run: rustup install nightly-2022-04-24
       - persist_to_workspace:
           root: "."
           paths:
@@ -97,7 +97,27 @@ jobs:
 
       - run:
           name: Check benches (nightly)
-          command: cargo +nightly-2021-08-09 check --all-targets --frozen --workspace
+          command: cargo +nightly-2022-04-24 check --all-targets --frozen --workspace
+
+  test_arm:
+    machine:
+      image: ubuntu-2004:202101-01
+    resource_class: arm.large
+    steps:
+      - checkout
+      - run:
+          name: Install Rust
+          command: |
+            curl https://sh.rustup.rs -sSf | sh -s -- --profile minimal --default-toolchain $(cat rust-toolchain) -y
+      - run:
+          name: Run cargo test pairing,multicore
+          command: cargo test --no-default-features --features pairing,multicore
+      - run:
+          name: Run cargo test blst,multicore
+          command: cargo test --release --no-default-features --features blst,multicore
+      - run:
+          name: Run cargo test blst,multicore,blst-portable
+          command: cargo test --release --no-default-features --features blst,multicore,blst-portable
 
   rustfmt:
     docker:
@@ -206,6 +226,7 @@ workflows:
       - test_nightly:
           requires:
             - cargo_fetch
+      - test_arm
       - publish_linux_release:
           requires:
             - cargo_fetch
