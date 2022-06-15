@@ -160,7 +160,7 @@ impl PrivateKey {
 
 impl Serialize for PrivateKey {
     fn write_bytes(&self, dest: &mut impl io::Write) -> io::Result<()> {
-        for digit in self.0.to_le_bits().as_buffer() {
+        for digit in &self.0.to_le_bits().data {
             dest.write_all(&digit.to_le_bytes())?;
         }
 
