@@ -5,6 +5,7 @@ authors = ["dignifiedquire <dignifiedquire@gmail.com>"]
 license = "MIT OR Apache-2.0"
 edition = "2018"
 resolver = "2"
+rust-version = "1.59.0"
 
 description = "Aggregate BLS Signatures"
 documentation = "https://docs.rs/bls-signatures"
@@ -18,16 +19,16 @@ rand_core = "0.6.0"
 thiserror = "1.0"
 subtle = "2.2.1"
 
-ff = "0.12"
-group = "0.12"
-pairing_lib = { version = "0.22.0", package = "pairing" }
+ff = "0.13"
+group = "0.13"
+pairing_lib = { version = "0.23.0", package = "pairing" }
 
-bls12_381 = { version = "=0.7.0", optional = true, features = ["experimental"] }
+bls12_381 = { version = "0.8.0", optional = true, features = ["experimental"] }
 sha2 = { version = "0.9", optional = true }
 hkdf = { version = "0.11.0", optional = true }
 
 blst_lib = { version = "=0.3.10", optional = true, package = "blst" }
-blstrs = { version = "0.6.0", optional = true }
+blstrs = { version = "0.7.0", optional = true }
 
 [workspace]
 members = [
