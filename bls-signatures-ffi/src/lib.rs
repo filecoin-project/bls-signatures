@@ -1,3 +1,5 @@
+#![allow(clippy::missing_safety_doc)]
+
 use std::slice::from_raw_parts;
 
 #[cfg(feature = "pairing")]
@@ -86,7 +88,7 @@ pub unsafe extern "C" fn aggregate(
 
     let signatures = try_ffi!(
         parts
-            .map(|item| Signature::from_bytes(item))
+            .map(Signature::from_bytes)
             .collect::<Result<Vec<_>, _>>(),
         std::ptr::null_mut()
     );

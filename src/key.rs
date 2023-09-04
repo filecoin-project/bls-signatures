@@ -23,10 +23,10 @@ use crate::signature::*;
 
 pub(crate) const G1_COMPRESSED_SIZE: usize = 48;
 
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct PublicKey(pub(crate) G1Projective);
 
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct PrivateKey(pub(crate) Scalar);
 
 impl From<G1Projective> for PublicKey {
