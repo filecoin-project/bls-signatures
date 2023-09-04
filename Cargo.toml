@@ -5,7 +5,7 @@ authors = ["dignifiedquire <dignifiedquire@gmail.com>"]
 license = "MIT OR Apache-2.0"
 edition = "2018"
 resolver = "2"
-rust-version = "1.59.0"
+rust-version = "1.63.0"
 
 description = "Aggregate BLS Signatures"
 documentation = "https://docs.rs/bls-signatures"
