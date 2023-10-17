@@ -245,8 +245,6 @@ fn key_gen<T: AsRef<[u8]>>(data: T) -> Scalar {
 /// https://tools.ietf.org/html/draft-irtf-cfrg-bls-signature-02#section-2.3
 #[cfg(feature = "blst")]
 fn key_gen<T: AsRef<[u8]>>(data: T) -> Scalar {
-    use std::convert::TryInto;
-
     let data = data.as_ref();
     assert!(data.len() >= 32, "IKM must be at least 32 bytes");
 
