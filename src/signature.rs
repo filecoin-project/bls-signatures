@@ -113,10 +113,8 @@ pub fn aggregate(signatures: &[Signature]) -> Result<Signature, Error> {
     }
 
     let res = signatures
-        .into_iter()
-        .fold(G2Projective::identity(), |acc, signature| {
-            acc + &signature.0
-        });
+        .iter()
+        .fold(G2Projective::identity(), |acc, signature| acc + signature.0);
 
     Ok(Signature(res.into()))
 }
