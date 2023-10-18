@@ -6,7 +6,7 @@ on:
     branches: master
 
 env:
-  MSRV: 1.63.0
+  MSRV: 1.67.1
   RUSTFLAGS: "-Dwarnings"
   CARGO_INCREMENTAL: 0
   RUST_BACKTRACE: 1
