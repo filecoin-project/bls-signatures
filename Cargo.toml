@@ -3,9 +3,9 @@ name = "bls-signatures"
 version = "0.15.0"
 authors = ["dignifiedquire <dignifiedquire@gmail.com>"]
 license = "MIT OR Apache-2.0"
-edition = "2018"
+edition = "2021"
 resolver = "2"
-rust-version = "1.63.0"
+rust-version = "1.67.1"
 
 description = "Aggregate BLS Signatures"
 documentation = "https://docs.rs/bls-signatures"
