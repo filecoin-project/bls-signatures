@@ -1,4 +1,4 @@
-use std::io;
+use std::{collections::HashSet, io};
 
 #[cfg(feature = "multicore")]
 use rayon::prelude::*;
@@ -139,12 +139,15 @@ pub fn verify(signature: &Signature, hashes: &[G2Projective], public_keys: &[Pub
     // Enforce that messages are distinct as a countermeasure against BLS's rogue-key attack.
     // See Section 3.1. of the IRTF's BLS signatures spec:
     // https://tools.ietf.org/html/draft-irtf-cfrg-bls-signature-02#section-3.1
-    for i in 0..(n_hashes - 1) {
-        for j in (i + 1)..n_hashes {
-            if hashes[i] == hashes[j] {
-                return false;
-            }
-        }
+    if hashes
+        .iter()
+        // This is the best way to get something we can actually hash.
+        .map(|h| G2Affine::from(h).to_compressed())
+        .collect::<HashSet<_>>()
+        .len()
+        != hashes.len()
+    {
+        return false;
     }
 
     #[cfg(feature = "multicore")]
