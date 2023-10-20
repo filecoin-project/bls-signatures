@@ -1,5 +1,4 @@
 use std::io;
-use std::sync::atomic::{AtomicBool, Ordering};
 
 #[cfg(feature = "multicore")]
 use rayon::prelude::*;
@@ -132,8 +131,8 @@ pub fn verify(signature: &Signature, hashes: &[G2Projective], public_keys: &[Pub
         return false;
     }
 
-    // zero key & single hash should fail
-    if n_hashes == 1 && public_keys[0].0.is_identity().into() {
+    // zero keys should always fail.
+    if public_keys.iter().any(|pk| pk.0.is_identity().into()) {
         return false;
     }
 
@@ -148,16 +147,11 @@ pub fn verify(signature: &Signature, hashes: &[G2Projective], public_keys: &[Pub
         }
     }
 
-    let is_valid = AtomicBool::new(true);
-
     #[cfg(feature = "multicore")]
     let mut ml = public_keys
         .par_iter()
         .zip(hashes.par_iter())
         .map(|(pk, h)| {
-            if pk.0.is_identity().into() {
-                is_valid.store(false, Ordering::Relaxed);
-            }
             let pk = pk.as_affine();
             let h = G2Affine::from(h).into();
             Bls12::multi_miller_loop(&[(&pk, &h)])
@@ -169,18 +163,11 @@ pub fn verify(signature: &Signature, hashes: &[G2Projective], public_keys: &[Pub
         .iter()
         .zip(hashes.iter())
         .map(|(pk, h)| {
-            if pk.0.is_identity().into() {
-                is_valid.store(false, Ordering::Relaxed);
-            }
             let pk = pk.as_affine();
             let h = G2Affine::from(h).into();
             Bls12::multi_miller_loop(&[(&pk, &h)])
         })
         .fold(MillerLoopResult::default(), |acc, cur| acc + cur);
-
-    if !is_valid.load(Ordering::Relaxed) {
-        return false;
-    }
 
     let g1_neg = -G1Affine::generator();
 
@@ -214,6 +201,8 @@ pub fn verify_messages(
     messages: &[&[u8]],
     public_keys: &[PublicKey],
 ) -> bool {
+    use blst_lib::BLST_ERROR;
+
     if messages.is_empty() || public_keys.is_empty() {
         return false;
     }
@@ -236,45 +225,31 @@ pub fn verify_messages(
         return false;
     }
 
-    let valid = AtomicBool::new(true);
-
     let n_workers = std::cmp::min(rayon::current_num_threads(), n_messages);
-    let mut pairings = messages
+    let Some(Ok(acc)) = messages
         .par_iter()
         .zip(public_keys.par_iter())
         .chunks(n_messages / n_workers)
-        .map(|chunk| {
+        .map(|chunk| -> Result<_, BLST_ERROR> {
             let mut pairing = blstrs::PairingG1G2::new(true, CSUITE);
 
             for (message, public_key) in chunk {
-                let res = pairing.aggregate(&public_key.0.into(), None, message, &[]);
-                if res.is_err() {
-                    valid.store(false, Ordering::Relaxed);
-                    break;
-                }
+                pairing.aggregate(&public_key.0.into(), None, message, &[])?;
             }
-            if valid.load(Ordering::Relaxed) {
-                pairing.commit();
-            }
-
-            pairing
+            pairing.commit();
+            Ok(pairing)
         })
-        .collect::<Vec<_>>();
+        .try_reduce_with(|mut acc, pairing| -> Result<_, BLST_ERROR> {
+            acc.merge(&pairing)?;
+            Ok(acc)
+        })
+    else {
+        return false;
+    };
 
     let mut gtsig = Gt::default();
-    if valid.load(Ordering::Relaxed) {
-        blstrs::PairingG1G2::aggregated(&mut gtsig, &signature.0);
-    }
-
-    let mut acc = pairings.pop().unwrap();
-    for pairing in &pairings {
-        let res = acc.merge(pairing);
-        if res.is_err() {
-            return false;
-        }
-    }
-
-    valid.load(Ordering::Relaxed) && acc.finalverify(Some(&gtsig))
+    blstrs::PairingG1G2::aggregated(&mut gtsig, &signature.0);
+    acc.finalverify(Some(&gtsig))
 }
 
 /// Verifies that the signature is the actual aggregated signature of messages - pubkeys.
@@ -307,24 +282,21 @@ pub fn verify_messages(
         return false;
     }
 
-    let mut valid = true;
     let mut pairing = blstrs::PairingG1G2::new(true, CSUITE);
     for (message, public_key) in messages.iter().zip(public_keys.iter()) {
-        let res = pairing.aggregate(&public_key.0.into(), None, message, &[]);
-        if res.is_err() {
-            valid = false;
-            break;
+        if pairing
+            .aggregate(&public_key.0.into(), None, message, &[])
+            .is_err()
+        {
+            return false;
         }
-
         pairing.commit();
     }
 
     let mut gtsig = Gt::default();
-    if valid {
-        blstrs::PairingG1G2::aggregated(&mut gtsig, &signature.0);
-    }
+    blstrs::PairingG1G2::aggregated(&mut gtsig, &signature.0);
 
-    valid && pairing.finalverify(Some(&gtsig))
+    pairing.finalverify(Some(&gtsig))
 }
 
 #[cfg(test)]
