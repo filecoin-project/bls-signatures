@@ -4,6 +4,9 @@ use ff::{PrimeField, PrimeFieldBits};
 use group::Curve;
 use rand_core::{CryptoRng, RngCore};
 
+#[cfg(feature = "multicore")]
+use rayon::prelude::*;
+
 #[cfg(feature = "pairing")]
 use bls12_381::{hash_to_curve::HashToField, G1Affine, G1Projective, Scalar};
 #[cfg(feature = "pairing")]
@@ -359,3 +362,21 @@ mod tests {
         assert!(PublicKey::from_bytes(&[255u8; 48]).is_err());
     }
 }
+
+pub fn aggregate_public_keys(public_keys: &[PublicKey]) -> Result<PublicKey, Error> {
+
+    if public_keys.is_empty() {
+        return Err(Error::ZeroSizedInput);
+    }
+
+    let res = public_keys
+        .into_par_iter()
+        .fold(G1Projective::identity, |mut acc, public_key| {
+            acc += &public_key.0;
+            acc
+        })
+        .reduce(G1Projective::identity, |acc, val| acc + val);
+
+    Ok(PublicKey(res.into()))
+}
+
