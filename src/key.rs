@@ -10,6 +10,7 @@ use bls12_381::{hash_to_curve::HashToField, G1Affine, G1Projective, Scalar};
 use hkdf::Hkdf;
 #[cfg(feature = "pairing")]
 use sha2::{digest::generic_array::typenum::U48, digest::generic_array::GenericArray, Sha256};
+#[cfg(feature = "zeroize")]
 use zeroize::{DefaultIsZeroes, Zeroize};
 
 #[cfg(feature = "blst")]
@@ -27,10 +28,18 @@ pub(crate) const G1_COMPRESSED_SIZE: usize = 48;
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct PublicKey(pub(crate) G1Projective);
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Zeroize)]
-pub struct PrivateKey(pub(crate) Scalar)
-where
-    Scalar: Zeroize + DefaultIsZeroes;
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub struct PrivateKey(pub(crate) Scalar);
+
+#[cfg(feature = "zeroize")]
+impl Zeroize for PrivateKey {
+    fn zeroize(&mut self) {
+        self.0.zeroize()
+    }
+}
+
+#[cfg(feature = "zeroize")]
+impl DefaultIsZeroes for PrivateKey {}
 
 impl From<G1Projective> for PublicKey {
     fn from(val: G1Projective) -> Self {
