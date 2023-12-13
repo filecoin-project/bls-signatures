@@ -30,7 +30,7 @@ pub struct PublicKey(pub(crate) G1Projective);
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Zeroize)]
 pub struct PrivateKey(pub(crate) Scalar)
 where
-    Scalar: DefaultIsZeroes;
+    Scalar: Zeroize + DefaultIsZeroes;
 
 impl From<G1Projective> for PublicKey {
     fn from(val: G1Projective) -> Self {
