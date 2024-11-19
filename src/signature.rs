@@ -306,7 +306,8 @@ pub fn verify_messages(
 mod tests {
     use super::*;
 
-    use base64::STANDARD;
+    use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
+    use base64::Engine as _;
     use ff::Field;
     use rand::{Rng, SeedableRng};
     use rand_chacha::ChaCha8Rng;
@@ -490,7 +491,7 @@ mod tests {
         assert_eq!(Signature::from_bytes(&signature_bytes).unwrap(), signature);
     }
 
-    base64_serde_type!(Base64Standard, STANDARD);
+    base64_serde_type!(Base64Standard, BASE64_STANDARD);
 
     #[derive(Debug, Clone, Deserialize)]
     struct Case {
@@ -564,12 +565,17 @@ mod tests {
             );
 
             if case.ciphersuite.as_bytes() == CSUITE {
-                let pub_key =
-                    PublicKey::from_bytes(&base64::decode(case.pub_key.as_ref().unwrap()).unwrap())
-                        .unwrap();
+                let pub_key = PublicKey::from_bytes(
+                    &BASE64_STANDARD
+                        .decode(case.pub_key.as_ref().unwrap())
+                        .unwrap(),
+                )
+                .unwrap();
                 let priv_key = PrivateKey::from_string(case.priv_key.as_ref().unwrap()).unwrap();
                 let signature = Signature::from_bytes(
-                    &base64::decode(case.signature.as_ref().unwrap()).unwrap(),
+                    &BASE64_STANDARD
+                        .decode(case.signature.as_ref().unwrap())
+                        .unwrap(),
                 )
                 .unwrap();
 
