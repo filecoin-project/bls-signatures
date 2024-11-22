@@ -16,8 +16,6 @@ use blstrs::{G1Affine, G1Projective, G2Affine, Scalar};
 #[cfg(feature = "blst")]
 use group::prime::PrimeCurveAffine;
 
-pub(crate) struct ScalarRepr(<Scalar as PrimeFieldBits>::ReprBits);
-
 use crate::error::Error;
 use crate::signature::*;
 
@@ -49,18 +47,6 @@ impl From<Scalar> for PrivateKey {
 impl From<PrivateKey> for Scalar {
     fn from(val: PrivateKey) -> Self {
         val.0
-    }
-}
-
-impl From<PrivateKey> for ScalarRepr {
-    fn from(val: PrivateKey) -> Self {
-        ScalarRepr(val.0.to_le_bits().into_inner())
-    }
-}
-
-impl<'a> From<&'a PrivateKey> for ScalarRepr {
-    fn from(val: &'a PrivateKey) -> Self {
-        (*val).into()
     }
 }
 
