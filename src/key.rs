@@ -2,7 +2,7 @@ use std::io;
 
 use ff::{PrimeField, PrimeFieldBits};
 use group::Curve;
-use rand_core::{CryptoRng, RngCore};
+use rand_core::{CryptoRng, RngCore, TryRngCore};
 
 #[cfg(feature = "pairing")]
 use bls12_381::{hash_to_curve::HashToField, G1Affine, G1Projective, Scalar};
