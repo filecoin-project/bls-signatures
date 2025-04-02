@@ -56,7 +56,7 @@ fn run(num_messages: usize) {
 
     // generate messages
     let messages: Vec<Vec<u8>> = (0..num_messages)
-        .map(|_| (0..64).map(|_| rng.gen()).collect())
+        .map(|_| (0..64).map(|_| rng.random()).collect())
         .collect();
 
     // sign messages

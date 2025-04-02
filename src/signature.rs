@@ -333,7 +333,7 @@ mod tests {
 
         // generate messages
         let messages: Vec<Vec<u8>> = (0..num_messages)
-            .map(|_| (0..64).map(|_| rng.gen()).collect())
+            .map(|_| (0..64).map(|_| rng.random()).collect())
             .collect();
 
         // sign messages
@@ -379,7 +379,7 @@ mod tests {
             .collect();
 
         // generate messages
-        let message: Vec<u8> = (0..64).map(|_| rng.gen()).collect();
+        let message: Vec<u8> = (0..64).map(|_| rng.random()).collect();
 
         // sign messages
         let sigs = private_keys
@@ -432,7 +432,7 @@ mod tests {
 
         // generate messages
         let messages: Vec<Vec<u8>> = (0..num_messages)
-            .map(|_| (0..64).map(|_| rng.gen()).collect())
+            .map(|_| (0..64).map(|_| rng.random()).collect())
             .collect();
 
         // sign messages
@@ -483,7 +483,7 @@ mod tests {
         let mut rng = ChaCha8Rng::seed_from_u64(12);
         let sk = PrivateKey::generate(&mut rng);
 
-        let msg = (0..64).map(|_| rng.gen()).collect::<Vec<u8>>();
+        let msg = (0..64).map(|_| rng.random()).collect::<Vec<u8>>();
         let signature = sk.sign(&msg);
 
         let signature_bytes = signature.as_bytes();
