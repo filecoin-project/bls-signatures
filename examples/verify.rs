@@ -6,7 +6,7 @@ use bls12_381::G2Projective;
 use blstrs::G2Projective;
 
 use bls_signatures::*;
-use rand::{Rng, SeedableRng};
+use rand::{RngExt, SeedableRng};
 use rand_chacha::ChaCha8Rng;
 use rayon::prelude::*;
 

@@ -13,7 +13,7 @@ use pairing_lib::MultiMillerLoop;
 #[cfg(feature = "blst")]
 use blstrs::{Bls12, G1Affine, G2Affine, G2Projective, Gt, MillerLoopResult};
 #[cfg(feature = "blst")]
-use group::{prime::PrimeCurveAffine, Group};
+use group::{CurveAffine, Group};
 #[cfg(feature = "blst")]
 use pairing_lib::MillerLoopResult as _;
 
@@ -76,7 +76,7 @@ fn g2_from_slice(raw: &[u8]) -> Result<G2Affine, Error> {
 /// Hash the given message, as used in the signature.
 #[cfg(feature = "pairing")]
 pub fn hash(msg: &[u8]) -> G2Projective {
-    <G2Projective as HashToCurve<ExpandMsgXmd<sha2::Sha256>>>::hash_to_curve(msg, CSUITE)
+    <G2Projective as HashToCurve<ExpandMsgXmd<sha2::Sha256>>>::hash_to_curve([msg], CSUITE)
 }
 
 #[cfg(feature = "blst")]
@@ -309,7 +309,7 @@ mod tests {
     use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
     use base64::Engine as _;
     use ff::Field;
-    use rand::{Rng, SeedableRng};
+    use rand::{RngExt, SeedableRng};
     use rand_chacha::ChaCha8Rng;
     use serde::Deserialize;
 
@@ -466,9 +466,9 @@ mod tests {
         ));
 
         // single message is rejected
-        let signature = zero_key.sign(&messages[0]);
+        let signature = zero_key.sign(messages[0]);
 
-        assert!(!zero_key.public_key().verify(signature, &messages[0]));
+        assert!(!zero_key.public_key().verify(signature, messages[0]));
 
         let aggregated_signature = aggregate(&[signature][..]).expect("failed to aggregate");
         assert!(!verify_messages(
@@ -529,7 +529,7 @@ mod tests {
 
     #[cfg(feature = "pairing")]
     fn hash_to_g1(msg: &[u8], suite: &[u8]) -> G1Projective {
-        <G1Projective as HashToCurve<ExpandMsgXmd<sha2::Sha256>>>::hash_to_curve(msg, suite)
+        <G1Projective as HashToCurve<ExpandMsgXmd<sha2::Sha256>>>::hash_to_curve([msg], suite)
     }
     #[cfg(feature = "blst")]
     fn hash_to_g1(msg: &[u8], suite: &[u8]) -> G1Projective {
@@ -538,7 +538,7 @@ mod tests {
 
     #[cfg(feature = "pairing")]
     fn hash_to_g2(msg: &[u8], suite: &[u8]) -> G2Projective {
-        <G2Projective as HashToCurve<ExpandMsgXmd<sha2::Sha256>>>::hash_to_curve(msg, suite)
+        <G2Projective as HashToCurve<ExpandMsgXmd<sha2::Sha256>>>::hash_to_curve([msg], suite)
     }
     #[cfg(feature = "blst")]
     fn hash_to_g2(msg: &[u8], suite: &[u8]) -> G2Projective {

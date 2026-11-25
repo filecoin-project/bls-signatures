@@ -4,19 +4,19 @@ extern crate test;
 use test::{black_box, Bencher};
 
 use bls_signatures::*;
-use rand::Rng;
+use rand::RngExt;
 
 macro_rules! bench_verify {
     ($name:ident, $num:expr) => {
         #[bench]
         fn $name(b: &mut Bencher) {
-            let rng = &mut rand::thread_rng();
+            let rng = &mut rand::rng();
             // generate private keys
             let private_keys: Vec<_> = (0..$num).map(|_| PrivateKey::generate(rng)).collect();
 
             // generate messages
             let messages: Vec<Vec<u8>> = (0..$num)
-                .map(|_| (0..64).map(|_| rng.gen()).collect())
+                .map(|_| (0..64).map(|_| rng.random()).collect())
                 .collect();
 
             // sign messages

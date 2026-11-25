@@ -5,6 +5,13 @@ on:
   push:
     branches: master
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
 env:
   RUSTFLAGS: "-Dwarnings"
   CARGO_INCREMENTAL: 0
@@ -15,13 +22,15 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       msrv: ${{ steps.msrv.outputs.MSRV }}
+      pinned: ${{ steps.msrv.outputs.PINNED }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Extract MSRV from Cargo.toml
         id: msrv
         run: |
           MSRV=$(cargo metadata --format-version 1 --no-deps | jq -r '.packages[0].rust_version')
           echo "MSRV=$MSRV" >> "$GITHUB_OUTPUT"
+          echo "PINNED=$(sed -n 's/^channel = "\(.*\)"$/\1/p' rust-toolchain.toml)" >> "$GITHUB_OUTPUT"
 
   # NOTE vmx 2022-06-14: currently doesn't work, hence run it on CircleCI
   # for now.
@@ -36,7 +45,7 @@ jobs:
 
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: uraimo/run-on-arch-action@v2.5.1
         name: Run commands
         id: runcmd
@@ -70,18 +79,18 @@ jobs:
             toolchain: ${{needs.set-msrv.outputs.msrv}}
             deps: sudo apt update && sudo apt install gcc-multilib
           - target: i686-unknown-linux-gnu
-            toolchain: stable
+            toolchain: ${{needs.set-msrv.outputs.pinned}}
             deps: sudo apt update && sudo apt install gcc-multilib
 
           # 64-bit Linux/x86_64
           - target: x86_64-unknown-linux-gnu
             toolchain: ${{needs.set-msrv.outputs.msrv}}
           - target: x86_64-unknown-linux-gnu
-            toolchain: stable
+            toolchain: ${{needs.set-msrv.outputs.pinned}}
 
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Install the Rust toolchain
         run: |
           rustup toolchain install ${{ matrix.toolchain }} --target ${{ matrix.target }} --profile minimal --no-self-update
@@ -104,11 +113,11 @@ jobs:
       matrix:
         toolchain:
           - ${{needs.set-msrv.outputs.msrv}}
-          - stable
+          - ${{needs.set-msrv.outputs.pinned}}
 
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Install the Rust toolchain
         run: |
           rustup toolchain install ${{ matrix.toolchain }} --target x86_64-apple-darwin --profile minimal --no-self-update
@@ -120,7 +129,7 @@ jobs:
       - run: cargo test --no-default-features --features blst,blst-portable
       - run: cargo test --no-default-features --features blst,multicore,blst-portable
 
- # Windows tests
+  # Windows tests
   windows:
     needs: set-msrv
     strategy:
@@ -132,7 +141,7 @@ jobs:
 
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Install the Rust toolchain
         run: |
           rustup toolchain install ${{ matrix.toolchain }} --target ${{ matrix.target }} --profile minimal --no-self-update
@@ -148,24 +157,21 @@ jobs:
   clippy_check_blst:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - run: rustup component add clippy
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Run Clippy
-        run: cargo clippy --workspace --no-default-features --features blst,multicore -- -D warnings
+        run: cargo clippy --workspace --tests --examples --no-default-features --features blst,multicore -- -D warnings
 
   clippy_check_pairing:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - run: rustup component add clippy
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Run Clippy
-        run: cargo clippy --workspace -- -D warnings
+        run: cargo clippy --workspace --tests --examples -- -D warnings
 
   check_fmt_and_docs:
     name: Checking fmt and docs
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
-    - run: rustup component add rustfmt
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
     - name: Run cargo fmt
       run: cargo fmt --all -- --check
