@@ -2,7 +2,7 @@ use std::io;
 
 use ff::{PrimeField, PrimeFieldBits};
 use group::Curve;
-use rand_core::{CryptoRng, TryRngCore};
+use rand_core::CryptoRng;
 
 #[cfg(feature = "pairing")]
 use bls12_381::{hash_to_curve::HashToField, G1Affine, G1Projective, Scalar};
@@ -14,7 +14,7 @@ use sha2::{digest::generic_array::typenum::U48, digest::generic_array::GenericAr
 #[cfg(feature = "blst")]
 use blstrs::{G1Affine, G1Projective, G2Affine, Scalar};
 #[cfg(feature = "blst")]
-use group::prime::PrimeCurveAffine;
+use group::CurveAffine;
 
 use crate::error::Error;
 use crate::signature::*;
@@ -77,8 +77,7 @@ impl PrivateKey {
         // IKM must be at least 32 bytes long:
         // https://tools.ietf.org/html/draft-irtf-cfrg-bls-signature-00#section-2.3
         let mut ikm = [0u8; 32];
-        rng.try_fill_bytes(&mut ikm)
-            .expect("unable to produce secure randomness");
+        rng.fill_bytes(&mut ikm);
 
         Self::new(ikm)
     }
@@ -154,7 +153,7 @@ impl Serialize for PrivateKey {
     }
 
     fn from_bytes(raw: &[u8]) -> Result<Self, Error> {
-        const FR_SIZE: usize = (Scalar::NUM_BITS as usize + 8 - 1) / 8;
+        const FR_SIZE: usize = (Scalar::NUM_BITS as usize).div_ceil(8);
         if raw.len() != FR_SIZE {
             return Err(Error::SizeMismatch);
         }
