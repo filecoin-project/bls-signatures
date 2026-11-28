@@ -179,6 +179,14 @@ pub fn verify(signature: &Signature, hashes: &[G2Projective], public_keys: &[Pub
     ml.final_exponentiation() == Gt::identity()
 }
 
+pub fn verify_agg_signatures_on_same_hash(signature: &Signature, hash: &G2Projective, public_keys: &[PublicKey]) -> bool {
+    // Aggregate the public keys into a single public key
+    let pub_key_aggregated = aggregate_public_keys(public_keys).unwrap();
+
+    // Verify this as normal
+    verify(signature, std::slice::from_ref(hash), std::slice::from_ref(&pub_key_aggregated))
+}
+
 /// Verifies that the signature is the actual aggregated signature of messages - pubkeys.
 /// Calculated by `e(g1, signature) == \prod_{i = 0}^n e(pk_i, hash_i)`.
 #[cfg(feature = "pairing")]
